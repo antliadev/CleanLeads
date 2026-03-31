@@ -11,7 +11,7 @@ import type { TemplateChannel } from '@prisma/client';
 // ═══════════════════════
 const templateSchema = z.object({
   name: z.string().min(2, 'Nome obrigatório (mínimo 2 caracteres)'),
-  channel: z.enum(['EMAIL', 'LINKEDIN']),
+  channel: z.enum(['EMAIL', 'LINKEDIN', 'WHATSAPP']),
   subject: z.string().optional(),
   body: z.string().min(10, 'Corpo da mensagem muito curto'),
   isActive: z.string().optional().transform((v) => v === 'true' || v === 'on'),
@@ -24,8 +24,18 @@ async function getAuthProfile() {
   const supabase = await createServerSupabase();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Error('Não autenticado');
-  const profile = await prisma.profile.findUnique({ where: { authUid: user.id } });
-  if (!profile) throw new Error('Perfil não encontrado');
+
+  // Recupera ou cria o perfil automaticamente
+  const profile = await prisma.profile.upsert({
+    where: { authUid: user.id },
+    update: {},
+    create: {
+      authUid: user.id,
+      email: user.email!,
+      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+    },
+  });
+
   return profile;
 }
 

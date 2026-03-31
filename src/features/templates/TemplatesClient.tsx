@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Mail, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Mail, ToggleLeft, ToggleRight, MessageSquare } from 'lucide-react';
 
 function LinkedinIcon({ className }: { className?: string }) {
   return (
@@ -60,6 +60,15 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
             )}
           >
             <LinkedinIcon className="w-3.5 h-3.5" /> LinkedIn
+          </button>
+          <button
+            onClick={() => setFilterChannel('WHATSAPP')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
+              filterChannel === 'WHATSAPP' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            )}
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
           </button>
           <button
             onClick={() => setFilterChannel('EMAIL')}
