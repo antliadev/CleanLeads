@@ -1,0 +1,208 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useActionState } from 'react';
+import { X, Loader2, Eye } from 'lucide-react';
+import { createTemplate, updateTemplate, type TemplateFormResult } from '@/actions/templates';
+import { TEMPLATE_CHANNEL_MAP } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import type { Template } from '@prisma/client';
+
+interface TemplateFormProps {
+  template?: Template;
+  onClose: () => void;
+}
+
+const PLACEHOLDER_LEAD = {
+  firstName: 'João',
+  fullName: 'João Silva',
+  company: 'Tech Corp',
+  jobTitle: 'CEO',
+};
+
+function resolveBody(body: string): string {
+  return body
+    .replace(/\{\{firstName\}\}/g, PLACEHOLDER_LEAD.firstName)
+    .replace(/\{\{fullName\}\}/g, PLACEHOLDER_LEAD.fullName)
+    .replace(/\{\{company\}\}/g, PLACEHOLDER_LEAD.company)
+    .replace(/\{\{jobTitle\}\}/g, PLACEHOLDER_LEAD.jobTitle);
+}
+
+export function TemplateForm({ template, onClose }: TemplateFormProps) {
+  const isEdit = !!template;
+  const action = isEdit ? updateTemplate.bind(null, template.id) : createTemplate;
+
+  const [state, formAction, isPending] = useActionState<TemplateFormResult | null, FormData>(
+    action,
+    null
+  );
+
+  const [channel, setChannel] = useState(template?.channel ?? 'LINKEDIN');
+  const [body, setBody] = useState(template?.body ?? '');
+  const [showPreview, setShowPreview] = useState(false);
+
+  if (state?.success) onClose();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+          <h2 className="text-xl font-bold text-slate-900">
+            {isEdit ? 'Editar Template' : 'Novo Template'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPreview((p) => !p)}
+              className={cn(
+                'flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl border transition-all',
+                showPreview
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              )}
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </button>
+            <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="max-h-[70vh] overflow-y-auto">
+          {showPreview ? (
+            <div className="px-8 py-6 space-y-4">
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Preview com dados de exemplo
+                </p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                  {resolveBody(body) || 'Nenhum conteúdo para prévia...'}
+                </p>
+              </div>
+              <div className="text-xs text-slate-400 flex flex-wrap gap-2">
+                <span className="font-semibold text-slate-500">Variáveis disponíveis:</span>
+                {['{{firstName}}', '{{fullName}}', '{{company}}', '{{jobTitle}}'].map((v) => (
+                  <code key={v} className="bg-slate-100 px-2 py-0.5 rounded-lg">{v}</code>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <form action={formAction} className="px-8 py-6 space-y-5">
+              {/* Nome */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Nome do Template <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  name="name"
+                  defaultValue={template?.name}
+                  required
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+                  placeholder="Abordagem inicial LinkedIn"
+                />
+              </div>
+
+              {/* Canal */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Canal</label>
+                <div className="flex gap-3">
+                  {Object.entries(TEMPLATE_CHANNEL_MAP).map(([value, { label }]) => (
+                    <label key={value} className="flex-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="channel"
+                        value={value}
+                        checked={channel === value}
+                        onChange={() => setChannel(value as any)}
+                        className="sr-only"
+                      />
+                      <div className={cn(
+                        'text-center py-2.5 rounded-xl border-2 text-sm font-semibold transition-all',
+                        channel === value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      )}>
+                        {label}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Assunto (só e-mail) */}
+              {channel === 'EMAIL' && (
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Assunto</label>
+                  <input
+                    name="subject"
+                    defaultValue={template?.subject ?? ''}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+                    placeholder="Assunto do e-mail"
+                  />
+                </div>
+              )}
+
+              {/* Corpo */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  Mensagem <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  name="body"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  required
+                  rows={6}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all resize-none"
+                  placeholder={`Olá {{firstName}},\n\nVi seu trabalho na {{company}}...`}
+                />
+                <p className="text-xs text-slate-400 mt-1.5">
+                  Use {'{{firstName}}'}, {'{{company}}'}, {'{{jobTitle}}'} para personalizar
+                </p>
+              </div>
+
+              {/* Ativo */}
+              <div className="flex items-center gap-3">
+                <input
+                  id="isActive"
+                  type="checkbox"
+                  name="isActive"
+                  value="on"
+                  defaultChecked={template?.isActive ?? true}
+                  className="w-4 h-4 rounded text-indigo-600"
+                />
+                <label htmlFor="isActive" className="text-sm font-medium text-slate-700">
+                  Template ativo
+                </label>
+              </div>
+
+              {state?.error && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-rose-600 text-sm">
+                  {state.error}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={onClose}
+                  className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={isPending}
+                  className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
+                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isEdit ? 'Salvar' : 'Criar Template'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,284 +4,94 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
-model User {
-  id                  String               @id @default(uuid())
-  name                String
-  email               String               @unique
-  passwordHash        String
-  role                UserRole             @default(OPERATOR)
-  isActive            Boolean              @default(true)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  linkedinAccessToken String?
-  linkedinConnected   Boolean              @default(false)
-  sendgridApiKey      String?
-  followUps           CommercialFollowUp[]
-  auditLogs           LeadAuditLog[]
-  importBatches       LeadImportBatch[]
-  statusHistories     LeadStatusHistory[]
+// ─────────────────────────────────────────────
+// PERFIL DO USUÁRIO (estende auth.users do Supabase)
+// ─────────────────────────────────────────────
+model Profile {
+  id        String   @id @default(uuid())
+  authUid   String   @unique @map("auth_uid")
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  leads     Lead[]
+  templates Template[]
+
+  @@map("profiles")
 }
 
+// ─────────────────────────────────────────────
+// LEADS
+// ─────────────────────────────────────────────
 model Lead {
-  id                          String               @id @default(uuid())
-  code                        String               @unique
-  company                     String
-  fullName                    String
-  firstName                   String?
-  jobTitle                    String?
-  emailOriginal               String?
-  emailNormalized             String?
-  emailValid                  Boolean              @default(false)
-  emailDomain                 String?
-  phoneOriginal               String?
-  phoneNormalized             String?
-  phoneSecondaryOriginal      String?
-  phoneSecondaryNormalized    String?
-  phoneValid                  Boolean              @default(false)
-  whatsappLink                String?
-  linkedinOriginal            String?
-  linkedinNormalized          String?
-  linkedinValid               Boolean              @default(false)
-  canMessageWithoutConnection Boolean              @default(false)
-  isDuplicate                 Boolean              @default(false)
-  duplicateOfLeadId           String?
-  treatmentStatus             String?
-  generalStatus               GeneralStatus        @default(NOVO)
-  linkedinStatus              LinkedinStatus       @default(NAO_INICIADO)
-  emailStatus                 EmailStatus          @default(NAO_INICIADO)
-  whatsappStatus              WhatsappStatus       @default(NAO_INICIADO)
-  commercialStatus            CommercialStatus     @default(SEM_INTERACAO)
-  manualNote                  String?
-  internalNote                String?
-  isBlocked                   Boolean              @default(false)
-  isConcluded                 Boolean              @default(false)
-  importedAt                  DateTime             @default(now())
-  importBatchId               String?
-  createdAt                   DateTime             @default(now())
-  updatedAt                   DateTime             @updatedAt
-  jobs                        AutomationJob[]
-  followUps                   CommercialFollowUp[]
-  importBatch                 LeadImportBatch?     @relation(fields: [importBatchId], references: [id])
-  auditLogs                   LeadAuditLog[]
-  interactions                LeadInteraction[]
-  statusHistories             LeadStatusHistory[]
+  id            String     @id @default(uuid())
+  profileId     String     @map("profile_id")
+  code          String     @unique @default(cuid())
+  fullName      String     @map("full_name")
+  company       String?
+  jobTitle      String?    @map("job_title")
+  email         String?
+  phone         String?
+  linkedinUrl   String?    @map("linkedin_url")
+  whatsappUrl   String?    @map("whatsapp_url")
+  status        LeadStatus @default(NOVO)
+  source        LeadSource @default(MANUAL)
+  notes         String?
+  importBatchId String?    @map("import_batch_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
 
-  @@index([code])
-  @@index([emailNormalized])
-  @@index([linkedinNormalized])
-  @@index([generalStatus])
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+  @@map("leads")
 }
 
-model LeadInteraction {
-  id                  String                @id @default(uuid())
-  leadId              String
-  channel             InteractionChannel
-  actionType          InteractionActionType
-  templateId          String?
-  subject             String?
-  messageBodySnapshot String?
-  result              String?
-  responseDetected    Boolean               @default(false)
-  responseDate        DateTime?
-  scheduledAt         DateTime?
-  sentAt              DateTime?
-  nextEligibleAt      DateTime?
-  createdAt           DateTime              @default(now())
-  lead                Lead                  @relation(fields: [leadId], references: [id])
-  template            Template?             @relation(fields: [templateId], references: [id])
-
-  @@index([leadId])
-}
-
-model LeadStatusHistory {
-  id              String         @id @default(uuid())
-  leadId          String
-  previousStatus  GeneralStatus?
-  newStatus       GeneralStatus
-  changedByUserId String?
-  changeOrigin    String?
-  note            String?
-  createdAt       DateTime       @default(now())
-  user            User?          @relation(fields: [changedByUserId], references: [id])
-  lead            Lead           @relation(fields: [leadId], references: [id])
-
-  @@index([leadId])
-}
-
-model LeadAuditLog {
-  id              String   @id @default(uuid())
-  leadId          String?
-  eventType       String
-  eventSource     String
-  payloadSnapshot Json?
-  createdByUserId String?
-  createdAt       DateTime @default(now())
-  user            User?    @relation(fields: [createdByUserId], references: [id])
-  lead            Lead?    @relation(fields: [leadId], references: [id])
-
-  @@index([leadId])
-}
-
+// ─────────────────────────────────────────────
+// TEMPLATES DE MENSAGEM
+// ─────────────────────────────────────────────
 model Template {
-  id              String            @id @default(uuid())
-  name            String
-  channel         TemplateChannel
-  templateType    String
-  subjectTemplate String?
-  bodyTemplate    String
-  isActive        Boolean           @default(true)
-  version         Int               @default(1)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  interactions    LeadInteraction[]
+  id        String          @id @default(uuid())
+  profileId String          @map("profile_id")
+  name      String
+  channel   TemplateChannel
+  subject   String?
+  body      String
+  isActive  Boolean         @default(true) @map("is_active")
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([channel])
+  @@map("templates")
 }
 
-model AutomationJob {
-  id           String   @id @default(uuid())
-  leadId       String
-  jobType      String
-  scheduledFor DateTime
-  status       String   @default("PENDING")
-  retryCount   Int      @default(0)
-  lastError    String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  lead         Lead     @relation(fields: [leadId], references: [id])
-
-  @@index([leadId, status])
-  @@index([scheduledFor])
-}
-
-model CommercialFollowUp {
-  id              String    @id @default(uuid())
-  leadId          String
-  responseChannel String?
-  responseDate    DateTime?
-  ownerUserId     String?
-  summary         String?
-  nextStep        String?
-  note            String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  lead            Lead      @relation(fields: [leadId], references: [id])
-  user            User?     @relation(fields: [ownerUserId], references: [id])
-
-  @@index([leadId])
-}
-
-model LeadImportBatch {
-  id                    String          @id @default(uuid())
-  fileName              String
-  originalFileType      String
-  uploadedByUserId      String?
-  uploadedAt            DateTime        @default(now())
-  processingStartedAt   DateTime?
-  processingFinishedAt  DateTime?
-  status                String          @default("PENDING")
-  totalRows             Int             @default(0)
-  totalValidRows        Int             @default(0)
-  totalInvalidRows      Int             @default(0)
-  totalDuplicateRows    Int             @default(0)
-  totalManualReviewRows Int             @default(0)
-  mappingSnapshot       Json?
-  errorSummary          String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  leads                 Lead[]
-  user                  User?           @relation(fields: [uploadedByUserId], references: [id])
-  rows                  LeadImportRow[]
-}
-
-model LeadImportRow {
-  id                String          @id @default(uuid())
-  importBatchId     String
-  rowNumber         Int
-  rawPayload        Json
-  normalizedPayload Json?
-  validationStatus  String?
-  validationErrors  Json?
-  duplicateDetected Boolean         @default(false)
-  generatedLeadId   String?
-  createdAt         DateTime        @default(now())
-  batch             LeadImportBatch @relation(fields: [importBatchId], references: [id])
-
-  @@index([importBatchId])
-}
-
-enum UserRole {
-  ADMIN
-  OPERATOR
-}
-
-enum GeneralStatus {
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+enum LeadStatus {
   NOVO
-  PRONTO_PARA_CONTATO
-  AGUARDANDO_CONTATO
-  AGUARDANDO_RESPOSTA
-  RESPONDIDO
-  EM_CONTATO
-  BLOQUEADO
-  CONCLUIDO
-  REVISAO_MANUAL
-  AGUARDANDO_ANALISE
+  CONTATADO
+  EM_NEGOCIACAO
+  CONVERTIDO
+  PERDIDO
 }
 
-enum LinkedinStatus {
-  NAO_INICIADO
-  MENSAGEM_DIRETA_DISPONIVEL
-  MENSAGEM_DIRETA_ENVIADA
-  CONVITE_ENVIADO
-  AGUARDANDO_ACEITE
-  CONEXAO_ACEITA
-  MENSAGEM_ENVIADA_APOS_CONEXAO
-  RESPONDEU_LINKEDIN
-  SEM_RETORNO
-  ENCERRADO
-}
-
-enum EmailStatus {
-  NAO_INICIADO
-  EMAIL_ENVIADO
-  AGUARDANDO_RESPOSTA
-  EMAIL_RESPONDIDO
-  SEM_RETORNO
-  ENCERRADO
-}
-
-enum WhatsappStatus {
-  NAO_INICIADO
-  LINK_ENVIADO
-  RESPONDIDO_WHATSAPP
-}
-
-enum CommercialStatus {
-  SEM_INTERACAO
-  AGUARDANDO_RESPOSTA
-  EM_CONTATO
-  QUALIFICADO
-  REUNIAO_AGENDADA
-  SEM_INTERESSE
-  ENCERRADO
-}
-
-enum InteractionChannel {
-  LINKEDIN
-  EMAIL
-  WHATSAPP
-}
-
-enum InteractionActionType {
-  LINKEDIN_INVITE
-  LINKEDIN_MESSAGE
-  EMAIL_INITIAL
-  EMAIL_FOLLOWUP
-  WHATSAPP_LINK_SENT
+enum LeadSource {
+  MANUAL
+  IMPORTACAO_CSV
+  IMPORTACAO_XLSX
 }
 
 enum TemplateChannel {
-  LINKEDIN
   EMAIL
+  LINKEDIN
 }
