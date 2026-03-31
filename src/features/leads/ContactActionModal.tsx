@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Copy, ExternalLink, Check, Mail } from 'lucide-react';
+import { X, Copy, ExternalLink, Check, Mail, MessageCircle } from 'lucide-react';
 import { Template, TemplateChannel } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { parseTemplate } from '@/lib/template-parser';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
-import { getGmailComposeUrl } from '@/lib/utils';
+import { getGmailComposeUrl, getWhatsAppUrl } from '@/lib/utils';
 
 type LeadWithHistory = Prisma.LeadGetPayload<{
   include: { histories: true };
@@ -102,10 +102,22 @@ export function ContactActionModal({
       if (gmailUrl) {
         window.open(gmailUrl, '_blank', 'noopener,noreferrer');
       }
+    } else if (channel === 'WHATSAPP' && lead.phone) {
+      // Abre o WhatsApp com a mensagem personalizada
+      const whatsappUrl = getWhatsAppUrl(lead.phone, compiledText);
+      if (whatsappUrl) {
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      }
     }
   };
 
   const isLinkedIn = channel === 'LINKEDIN';
+  const isWhatsApp = channel === 'WHATSAPP';
+  const isEmail = channel === 'EMAIL';
+
+  const channelLabel = isLinkedIn ? 'LinkedIn' : isWhatsApp ? 'WhatsApp' : 'E-mail';
+  const ChannelIcon = isLinkedIn ? LinkedinIcon : isWhatsApp ? MessageCircle : Mail;
+  const iconColor = isLinkedIn ? 'text-blue-600' : isWhatsApp ? 'text-emerald-600' : 'text-indigo-600';
 
   return (
     <div
@@ -121,12 +133,8 @@ export function ContactActionModal({
         <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              {isLinkedIn ? (
-                <LinkedinIcon className="w-5 h-5 text-blue-600" />
-              ) : (
-                <Mail className="w-5 h-5 text-indigo-600" />
-              )}
-              Contato via {isLinkedIn ? 'LinkedIn' : 'E-mail'}
+              <ChannelIcon className={`w-5 h-5 ${iconColor}`} />
+              Contato via {channelLabel}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               Preparando mensagem para{' '}
@@ -155,7 +163,7 @@ export function ContactActionModal({
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-medium transition-colors"
               >
                 <option value="" disabled>
-                  Selecione um template de {isLinkedIn ? 'LinkedIn' : 'E-mail'}
+                  Selecione um template de {channelLabel}
                 </option>
                 {activeTemplates.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -165,8 +173,7 @@ export function ContactActionModal({
               </select>
             ) : (
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-sm">
-                Nenhum template ativo encontrado para{' '}
-                {isLinkedIn ? 'LinkedIn' : 'E-mail'}. Crie um na guia Templates.
+                Nenhum template ativo encontrado para {channelLabel}. Crie um na guia Templates.
               </div>
             )}
           </div>
@@ -233,7 +240,11 @@ export function ContactActionModal({
             ) : (
               <>
                 <Copy className="w-4 h-4" />
-                {isLinkedIn ? 'Copiar & Abrir LinkedIn' : 'Copiar & Abrir Gmail'}
+                {isLinkedIn 
+                  ? 'Copiar & Abrir LinkedIn' 
+                  : isWhatsApp 
+                    ? 'Copiar & Abrir WhatsApp' 
+                    : 'Copiar & Abrir Gmail'}
               </>
             )}
           </button>

@@ -11,9 +11,11 @@ export const ImportRowSchema = z.object({
     .min(2, 'O nome deve ter pelo menos 2 caracteres')
     .transform((str) => toTitleCase(str)),
   email: z
-    .string({ message: 'O e-mail é obrigatório' })
+    .string()
     .email('O e-mail informado é inválido')
-    .transform((str) => str.toLowerCase().trim()),
+    .optional()
+    .or(z.literal(''))
+    .transform((str) => str?.toLowerCase().trim() || undefined),
   company: z
     .string()
     .optional()
@@ -34,6 +36,14 @@ export const ImportRowSchema = z.object({
     .string()
     .optional()
     .transform((str) => str?.trim() || undefined),
+}).superRefine((data, ctx) => {
+  if (!data.email && !data.phone && !data.linkedinUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O lead deve ter pelo menos uma forma de contato (E-mail, Telefone ou LinkedIn)',
+      path: ['email'], // Aponta para email como padrão de erro de contato
+    });
+  }
 });
 
 export type LeadImportRow = z.infer<typeof ImportRowSchema>;

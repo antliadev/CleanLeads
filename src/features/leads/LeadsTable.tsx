@@ -144,13 +144,13 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                             </button>
                           )}
                           {lead.phone && (
-                            <a
-                              href={`tel:${lead.phone}`}
+                            <button
+                              onClick={() => setContactModal({ isOpen: true, lead, channel: 'WHATSAPP' })}
                               className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                              title={lead.phone}
+                              title="WhatsApp"
                             >
                               <Phone className="w-4 h-4" />
-                            </a>
+                            </button>
                           )}
                         </div>
                       </td>

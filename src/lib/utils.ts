@@ -92,6 +92,45 @@ export function getGmailComposeUrl(
 }
 
 /**
+ * Limpa o número de telefone e adiciona o prefixo +55 se for padrão Brasil (10 ou 11 dígitos).
+ */
+export function formatPhoneForWhatsApp(phone: string | null): string | null {
+  if (!phone) return null;
+
+  // Remove tudo que não for dígito
+  const cleaned = phone.replace(/\D/g, '');
+
+  if (!cleaned) return null;
+
+  // Se o número tiver 10 ou 11 dígitos, assumimos Brasil e adicionamos 55
+  if (cleaned.length === 10 || cleaned.length === 11) {
+    return `55${cleaned}`;
+  }
+
+  // Se já tiver 12 ou 13 dígitos, assumimos que já tem DDI (ex: 55...)
+  if (cleaned.length >= 12) {
+    return cleaned;
+  }
+
+  return null;
+}
+
+/**
+ * Gera a URL do WhatsApp Web/App com mensagem opcional.
+ */
+export function getWhatsAppUrl(phone: string | null, message?: string): string | null {
+  const formattedPhone = formatPhoneForWhatsApp(phone);
+  if (!formattedPhone) return null;
+
+  const baseUrl = `https://wa.me/${formattedPhone}`;
+  if (message) {
+    return `${baseUrl}?text=${encodeURIComponent(message)}`;
+  }
+
+  return baseUrl;
+}
+
+/**
  * Converte uma string para Title Case, respeitando preposições comuns em PT-BR.
  */
 export function toTitleCase(str: string | null | undefined): string {

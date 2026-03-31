@@ -191,7 +191,7 @@ export function ImportWizard() {
           <FileSpreadsheet className="w-16 h-16 text-indigo-200 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Importar Planilha</h2>
           <p className="text-slate-500 mb-8 max-w-md mx-auto">
-            Faça upload do seu arquivo Excel ou CSV. O arquivo deve conter colunas para Nome e E-mail obrigatórias. Extensões aceitas: .xlsx, .xls, .csv.
+            Faça upload do seu arquivo Excel ou CSV. O lead será importado se possuir pelo menos uma forma de contato (E-mail, Telefone ou LinkedIn).
           </p>
           <label className="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-200 hover:bg-indigo-100 transition-colors rounded-2xl p-8 flex flex-col items-center max-w-lg mx-auto">
             <Upload className="w-8 h-8 text-indigo-500 mb-2" />
@@ -211,7 +211,7 @@ export function ImportWizard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Object.entries({
                fullName: 'Nome Completo (*)',
-               email: 'E-mail (*)',
+               email: 'E-mail',
                company: 'Empresa',
                jobTitle: 'Cargo',
                phone: 'Telefone',

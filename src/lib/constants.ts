@@ -64,6 +64,7 @@ export const LEAD_SOURCE_MAP = {
 export const TEMPLATE_CHANNEL_MAP = {
   EMAIL: { label: 'E-mail', color: 'bg-indigo-50 text-indigo-600' },
   LINKEDIN: { label: 'LinkedIn', color: 'bg-blue-50 text-blue-600' },
+  WHATSAPP: { label: 'WhatsApp', color: 'bg-emerald-50 text-emerald-600' },
 } as const;
 
 /**

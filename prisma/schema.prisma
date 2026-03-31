@@ -114,4 +114,5 @@ enum LeadSource {
 enum TemplateChannel {
   EMAIL
   LINKEDIN
+  WHATSAPP
 }

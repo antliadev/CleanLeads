@@ -116,16 +116,58 @@ export async function deleteTemplate(id: string): Promise<TemplateFormResult> {
 export async function improveTemplateText(text: string): Promise<string> {
   if (!text) return '';
 
-  return text
-    // 1. Remove espaços duplos
+  let improved = text;
+
+  // 1. Dicionário de correções comuns (accentuation e typos frequentes)
+  const corrections: Record<string, string> = {
+    'voce': 'você',
+    'Voce': 'Você',
+    'ola': 'olá',
+    'Ola': 'Olá',
+    'esta': 'está',
+    'Esta': 'Está',
+    'estao': 'estão',
+    'Estao': 'Estão',
+    'e-mail': 'e-mail',
+    'email': 'e-mail',
+    'atencao': 'atenção',
+    'Atencao': 'Atenção',
+    'porem': 'porém',
+    'Porem': 'Porém',
+    'entao': 'então',
+    'Entao': 'Então',
+    'parabens': 'parabéns',
+    'Parabens': 'Parabéns',
+    'duvida': 'dúvida',
+    'Duvida': 'Dúvida',
+    'conectar': 'conectar',
+    'obrigado': 'obrigado',
+    'disposicao': 'disposição',
+    'Disposicao': 'Disposição',
+    'abraco': 'abraço',
+    'Abraco': 'Abraço',
+  };
+
+  // Aplica correções do dicionário (apenas palavras inteiras)
+  Object.entries(corrections).forEach(([wrong, right]) => {
+    const regex = new RegExp(`\\b${wrong}\\b`, 'g');
+    improved = improved.replace(regex, right);
+  });
+
+  return improved
+    // 2. Remove espaços duplos
     .replace(/\s{2,}/g, ' ')
-    // 2. Garante espaço após pontuação (vírgula, ponto, exclamação, interrogação)
+    // 3. Garante espaço após pontuação (vírgula, ponto, exclamação, interrogação)
+    // Evita quebrar as variáveis {{...}}
     .replace(/([,.;!?])([^\s{}])/g, '$1 $2')
-    // 3. Remove espaços antes da pontuação
+    // 4. Remove espaços antes da pontuação
     .replace(/\s+([,.;!?])/g, '$1')
-    // 4. Capitaliza a primeira letra de cada frase
+    // 5. Capitaliza a primeira letra de cada frase
     .replace(/(^|[.!?]\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase())
-    // 5. Trim final
+    // 6. Garante que variáveis {{...}} não tenham espaços internos inadequados
+    .replace(/{ \s* {/g, '{{')
+    .replace(/} \s* }/g, '}}')
+    // 7. Trim final
     .trim();
 }
 
