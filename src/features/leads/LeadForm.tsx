@@ -1,12 +1,14 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { createLead, updateLead, type LeadFormResult } from '@/actions/leads';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
-import type { Lead } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
-type LeadWithHistory = Lead & { histories?: any[] };
+type LeadWithHistory = Prisma.LeadGetPayload<{
+  include: { histories: true };
+}>;
 
 interface LeadFormProps {
   lead?: LeadWithHistory;
@@ -25,10 +27,10 @@ export function LeadForm({ lead, onClose }: LeadFormProps) {
     null
   );
 
-  // Fecha modal após sucesso
-  if (state?.success) {
-    onClose();
-  }
+  // Fecha modal APÓS o ciclo de render (evita setState-during-render)
+  useEffect(() => {
+    if (state?.success) onClose();
+  }, [state?.success]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

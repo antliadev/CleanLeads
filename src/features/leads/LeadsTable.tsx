@@ -11,10 +11,15 @@ import { deleteLead } from '@/actions/leads';
 import { formatDate, getLinkedinProfileUrl, getGmailComposeUrl } from '@/lib/utils';
 import { ContactActionModal } from './ContactActionModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
-import type { Lead, Template, TemplateChannel } from '@prisma/client';
+import type { Template, TemplateChannel } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+
+type LeadWithHistory = Prisma.LeadGetPayload<{
+  include: { histories: true };
+}>;
 
 interface LeadsTableProps {
-  leads: Lead[];
+  leads: LeadWithHistory[];
   total: number;
   page: number;
   totalPages: number;
@@ -23,9 +28,9 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange }: LeadsTableProps) {
-  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [editingLead, setEditingLead] = useState<LeadWithHistory | null>(null);
   const [creating, setCreating] = useState(false);
-  const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: Lead | null; channel: TemplateChannel }>({ 
+  const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null; channel: TemplateChannel }>({ 
     isOpen: false, lead: null, channel: 'LINKEDIN' 
   });
 
@@ -81,7 +86,7 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
               <tbody className="divide-y divide-slate-50">
                 {leads.map((lead) => {
                   const sourceConfig = LEAD_SOURCE_MAP[lead.source];
-                  const linkedinUrl = getLinkedinProfileUrl(lead.linkedinUrl, lead.fullName);
+                  const linkedinUrl = getLinkedinProfileUrl(lead.linkedinUrl);
                   const gmailUrl = getGmailComposeUrl(lead.email, lead.fullName);
 
                   return (

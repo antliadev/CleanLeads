@@ -2,10 +2,15 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
-import type { Lead, Template } from '@prisma/client';
+import type { Template } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+
+type LeadWithHistory = Prisma.LeadGetPayload<{
+  include: { histories: true };
+}>;
 
 interface LeadsTableWrapperProps {
-  leads: Lead[];
+  leads: LeadWithHistory[];
   total: number;
   page: number;
   totalPages: number;

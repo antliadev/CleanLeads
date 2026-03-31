@@ -4,6 +4,8 @@ import {
   Handshake,
   CheckCircle2,
   XCircle,
+  UserPlus,
+  Hourglass,
 } from 'lucide-react';
 
 /**
@@ -14,6 +16,16 @@ export const LEAD_STATUS_MAP = {
     label: 'Novo',
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     icon: Clock,
+  },
+  AGUARDANDO_CONEXAO: {
+    label: 'Aguardando Conexão',
+    color: 'bg-sky-50 text-sky-700 border-sky-200',
+    icon: UserPlus,
+  },
+  AGUARDANDO_RETORNO: {
+    label: 'Aguardando Retorno',
+    color: 'bg-orange-50 text-orange-700 border-orange-200',
+    icon: Hourglass,
   },
   CONTATADO: {
     label: 'Contatado',

@@ -41,7 +41,10 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
   const [body, setBody] = useState(template?.body ?? '');
   const [showPreview, setShowPreview] = useState(false);
 
-  if (state?.success) onClose();
+  // Fecha modal APÓS o ciclo de render (evita setState-during-render)
+  useEffect(() => {
+    if (state?.success) onClose();
+  }, [state?.success]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

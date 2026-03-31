@@ -18,7 +18,7 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   linkedinUrl: z.string().url('URL LinkedIn inválida').optional().or(z.literal('')),
   whatsappUrl: z.string().url('URL WhatsApp inválida').optional().or(z.literal('')),
-  status: z.enum(['NOVO', 'CONTATADO', 'EM_NEGOCIACAO', 'CONVERTIDO', 'PERDIDO']).default('NOVO'),
+  status: z.enum(['NOVO', 'AGUARDANDO_CONEXAO', 'AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'CONVERTIDO', 'PERDIDO']).default('NOVO'),
   notes: z.string().optional(),
 });
 
@@ -68,11 +68,7 @@ export async function getLeads({
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where,
-      include: {
-        histories: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
+      include: { histories: { orderBy: { createdAt: 'desc' }, take: 10 } },
       orderBy: { createdAt: 'desc' },
       take,
       skip,
@@ -90,6 +86,7 @@ export async function getLeadById(id: string) {
   const profile = await getAuthProfile();
   const lead = await prisma.lead.findFirst({
     where: { id, profileId: profile.id },
+    include: { histories: { orderBy: { createdAt: 'desc' }, take: 20 } },
   });
   if (!lead) throw new Error('Lead não encontrado');
   return lead;

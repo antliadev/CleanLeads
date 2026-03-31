@@ -97,6 +97,8 @@ model LeadHistory {
 // ─────────────────────────────────────────────
 enum LeadStatus {
   NOVO
+  AGUARDANDO_CONEXAO
+  AGUARDANDO_RETORNO
   CONTATADO
   EM_NEGOCIACAO
   CONVERTIDO
