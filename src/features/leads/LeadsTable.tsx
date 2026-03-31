@@ -3,34 +3,31 @@
 import { useState } from 'react';
 import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
-function LinkedinIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-      <rect width="4" height="12" x="2" y="9" />
-      <circle cx="4" cy="4" r="2" />
-    </svg>
-  );
-}
+import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { LeadForm } from './LeadForm';
 import { deleteLead } from '@/actions/leads';
 import { formatDate, getLinkedinProfileUrl, getGmailComposeUrl } from '@/lib/utils';
+import { ContactActionModal } from './ContactActionModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
-import type { Lead } from '@prisma/client';
+import type { Lead, Template, TemplateChannel } from '@prisma/client';
 
 interface LeadsTableProps {
   leads: Lead[];
   total: number;
   page: number;
   totalPages: number;
+  templates: Template[];
   onPageChange: (page: number) => void;
 }
 
-export function LeadsTable({ leads, total, page, totalPages, onPageChange }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange }: LeadsTableProps) {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [creating, setCreating] = useState(false);
+  const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: Lead | null; channel: TemplateChannel }>({ 
+    isOpen: false, lead: null, channel: 'LINKEDIN' 
+  });
 
   async function handleDelete(id: string) {
     await deleteLead(id);
@@ -105,27 +102,23 @@ export function LeadsTable({ leads, total, page, totalPages, onPageChange }: Lea
                       {/* Canais de contato */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          {linkedinUrl && (
-                            <a
-                              href={linkedinUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                          {lead.linkedinUrl && (
+                            <button
+                              onClick={() => setContactModal({ isOpen: true, lead, channel: 'LINKEDIN' })}
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                               title="LinkedIn"
                             >
                               <LinkedinIcon className="w-4 h-4" />
-                            </a>
+                            </button>
                           )}
-                          {gmailUrl && (
-                            <a
-                              href={gmailUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                          {lead.email && (
+                            <button
+                              onClick={() => setContactModal({ isOpen: true, lead, channel: 'EMAIL' })}
                               className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                               title="Gmail"
                             >
                               <Mail className="w-4 h-4" />
-                            </a>
+                            </button>
                           )}
                           {lead.phone && (
                             <a
@@ -217,6 +210,14 @@ export function LeadsTable({ leads, total, page, totalPages, onPageChange }: Lea
       {/* Modais */}
       {creating && <LeadForm onClose={() => setCreating(false)} />}
       {editingLead && <LeadForm lead={editingLead} onClose={() => setEditingLead(null)} />}
+
+      <ContactActionModal
+        isOpen={contactModal.isOpen}
+        onClose={() => setContactModal(prev => ({ ...prev, isOpen: false }))}
+        lead={contactModal.lead}
+        channel={contactModal.channel}
+        templates={templates}
+      />
     </div>
   );
 }

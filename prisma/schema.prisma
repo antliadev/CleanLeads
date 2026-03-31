@@ -45,6 +45,7 @@ model Lead {
   updatedAt     DateTime   @updatedAt @map("updated_at")
 
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  histories LeadHistory[]
 
   @@index([profileId])
   @@index([status])
@@ -72,6 +73,23 @@ model Template {
   @@index([profileId])
   @@index([channel])
   @@map("templates")
+}
+
+// ─────────────────────────────────────────────
+// HISTÓRICO DO LEAD (Para rastrear Upserts e Merge de Importação)
+// ─────────────────────────────────────────────
+model LeadHistory {
+  id           String   @id @default(uuid())
+  leadId       String   @map("lead_id")
+  previousData Json     @map("previous_data")
+  newData      Json     @map("new_data")
+  actionBy     String?  @map("action_by") // 'IMPORTACAO', 'MANUAL', 'SISTEMA'
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_histories")
 }
 
 // ─────────────────────────────────────────────

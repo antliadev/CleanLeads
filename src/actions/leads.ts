@@ -68,6 +68,11 @@ export async function getLeads({
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where,
+      include: {
+        histories: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       take,
       skip,
@@ -104,7 +109,7 @@ export async function createLead(
     if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
     // Limpar campos vazios opcionais
-    const data = Object.fromEntries(
+    const data: any = Object.fromEntries(
       Object.entries(parsed.data).filter(([, v]) => v !== '' && v !== undefined)
     );
 
@@ -133,7 +138,7 @@ export async function updateLead(
     const parsed = leadSchema.safeParse(raw);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-    const data = Object.fromEntries(
+    const data: any = Object.fromEntries(
       Object.entries(parsed.data).filter(([, v]) => v !== '' && v !== undefined)
     );
 

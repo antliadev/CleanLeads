@@ -6,8 +6,10 @@ import { createLead, updateLead, type LeadFormResult } from '@/actions/leads';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import type { Lead } from '@prisma/client';
 
+type LeadWithHistory = Lead & { histories?: any[] };
+
 interface LeadFormProps {
-  lead?: Lead;
+  lead?: LeadWithHistory;
   onClose: () => void;
 }
 
@@ -147,6 +149,44 @@ export function LeadForm({ lead, onClose }: LeadFormProps) {
               />
             </div>
           </div>
+
+          {/* Seção de Histórico */}
+          {isEdit && lead?.histories && lead.histories.length > 0 && (
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                Histórico de Atualizações (Imports)
+              </h3>
+              <div className="space-y-3">
+                {lead.histories.map((h, i) => (
+                  <div key={h.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm">
+                    <p className="font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Atualizado via: <span className="text-indigo-600">{h.actionBy}</span></span>
+                      <span className="text-xs text-slate-400 font-normal">
+                        {new Date(h.createdAt).toLocaleString('pt-BR')}
+                      </span>
+                    </p>
+                    <details className="cursor-pointer">
+                      <summary className="text-xs text-slate-500 font-medium hover:text-indigo-600">Ver Dados Anteriores vs Novos</summary>
+                      <div className="mt-2 grid grid-cols-2 gap-4 text-xs font-mono bg-white p-3 rounded-lg border border-slate-100 max-h-40 overflow-auto">
+                        <div>
+                          <p className="text-slate-400 mb-1 uppercase font-bold text-[10px]">Antes</p>
+                          <pre className="text-slate-600 whitespace-pre-wrap">
+                            {JSON.stringify(h.previousData, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="text-indigo-400 mb-1 uppercase font-bold text-[10px]">Depois</p>
+                          <pre className="text-slate-600 whitespace-pre-wrap">
+                            {JSON.stringify(h.newData, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {state?.error && (
             <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-rose-600 text-sm font-medium">

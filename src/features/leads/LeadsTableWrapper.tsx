@@ -2,16 +2,17 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
-import type { Lead } from '@prisma/client';
+import type { Lead, Template } from '@prisma/client';
 
 interface LeadsTableWrapperProps {
   leads: Lead[];
   total: number;
   page: number;
   totalPages: number;
+  templates: Template[];
 }
 
-export function LeadsTableWrapper({ leads, total, page, totalPages }: LeadsTableWrapperProps) {
+export function LeadsTableWrapper({ leads, total, page, totalPages, templates }: LeadsTableWrapperProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -27,6 +28,7 @@ export function LeadsTableWrapper({ leads, total, page, totalPages }: LeadsTable
       total={total}
       page={page}
       totalPages={totalPages}
+      templates={templates}
       onPageChange={handlePageChange}
     />
   );

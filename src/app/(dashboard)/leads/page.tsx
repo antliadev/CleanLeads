@@ -21,6 +21,10 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const status = params.status || '';
 
   const { leads, total, totalPages } = await getLeads({ page, search, status });
+  // Opcional: injetamos os templates ativos para uso nos modais
+  const { getTemplates } = await import('@/actions/templates');
+  const temp = await getTemplates();
+  const activeTemplates = temp.filter(t => t.isActive);
 
   return (
     <div className="space-y-8">
@@ -55,6 +59,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           total={total}
           page={page}
           totalPages={totalPages}
+          templates={activeTemplates}
         />
       </Suspense>
     </div>
