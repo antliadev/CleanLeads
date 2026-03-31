@@ -64,14 +64,41 @@ export function ImportWizard() {
         const workbook = xlsx.read(data, { type: 'binary' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-        // Converte com header = 1 para pegar o array e extrair chaves
-        const json = xlsx.utils.sheet_to_json(worksheet);
         
-        if (json.length > 0) {
-          const cols = Object.keys(json[0] as object);
-          setColumns(cols);
-          setRawData(json);
-          autoMapColumns(cols);
+        // Extração customizada para capturar Hyperlinks (.l)
+        const range = xlsx.utils.decode_range(worksheet['!ref'] || 'A1');
+        const customData: any[] = [];
+        const headerRow: string[] = [];
+
+        // Identifica os headers na linha 0
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const address = xlsx.utils.encode_cell({ r: range.s.r, c: C });
+          const cell = worksheet[address];
+          headerRow.push(cell ? String(cell.v).trim() : `Coluna_${C + 1}`);
+        }
+
+        // Lê as linhas de dados
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          const row: any = {};
+          let hasData = false;
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const address = xlsx.utils.encode_cell({ r: R, c: C });
+            const cell = worksheet[address];
+            if (cell && cell.v !== undefined) {
+              const header = headerRow[C - range.s.c];
+              // Se a célula tiver um link real (.l), usamos o Target do link
+              // Caso contrário, usamos o valor visível (.v)
+              row[header] = cell.l?.Target || cell.v;
+              hasData = true;
+            }
+          }
+          if (hasData) customData.push(row);
+        }
+        
+        if (headerRow.length > 0) {
+          setColumns(headerRow);
+          setRawData(customData);
+          autoMapColumns(headerRow);
         }
         setStep(2);
       }

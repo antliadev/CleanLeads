@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
-import { X, Loader2, Eye } from 'lucide-react';
-import { createTemplate, updateTemplate, type TemplateFormResult } from '@/actions/templates';
+import { X, Loader2, Eye, Sparkles } from 'lucide-react';
+import { createTemplate, updateTemplate, improveTemplateText, type TemplateFormResult } from '@/actions/templates';
 import { TEMPLATE_CHANNEL_MAP } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Template } from '@prisma/client';
@@ -40,11 +40,23 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
   const [channel, setChannel] = useState(template?.channel ?? 'LINKEDIN');
   const [body, setBody] = useState(template?.body ?? '');
   const [showPreview, setShowPreview] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
 
   // Fecha modal APÓS o ciclo de render (evita setState-during-render)
   useEffect(() => {
     if (state?.success) onClose();
   }, [state?.success]);
+
+  const handleImproveText = async () => {
+    if (!body.trim()) return;
+    setIsImproving(true);
+    try {
+      const improved = await improveTemplateText(body);
+      setBody(improved);
+    } finally {
+      setIsImproving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -153,9 +165,24 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
 
               {/* Corpo */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Mensagem <span className="text-rose-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-semibold text-slate-700">
+                    Mensagem <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleImproveText}
+                    disabled={isImproving || !body.trim()}
+                    className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 transition-all px-2 py-1 rounded-lg hover:bg-indigo-50"
+                  >
+                    {isImproving ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3" />
+                    )}
+                    Ajustar Texto
+                  </button>
+                </div>
                 <textarea
                   name="body"
                   value={body}

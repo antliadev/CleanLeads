@@ -109,3 +109,23 @@ export async function deleteTemplate(id: string): Promise<TemplateFormResult> {
     return { success: false, error: err.message || 'Erro ao excluir template' };
   }
 }
+
+// ═══════════════════════
+// Assistente de Escrita
+// ═══════════════════════
+export async function improveTemplateText(text: string): Promise<string> {
+  if (!text) return '';
+
+  return text
+    // 1. Remove espaços duplos
+    .replace(/\s{2,}/g, ' ')
+    // 2. Garante espaço após pontuação (vírgula, ponto, exclamação, interrogação)
+    .replace(/([,.;!?])([^\s{}])/g, '$1 $2')
+    // 3. Remove espaços antes da pontuação
+    .replace(/\s+([,.;!?])/g, '$1')
+    // 4. Capitaliza a primeira letra de cada frase
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase())
+    // 5. Trim final
+    .trim();
+}
+

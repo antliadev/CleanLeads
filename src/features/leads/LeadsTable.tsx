@@ -7,7 +7,7 @@ import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { LeadForm } from './LeadForm';
-import { deleteLead } from '@/actions/leads';
+import { deleteLead, deleteAllLeads } from '@/actions/leads';
 import { formatDate, getLinkedinProfileUrl, getGmailComposeUrl } from '@/lib/utils';
 import { ContactActionModal } from './ContactActionModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
@@ -45,13 +45,31 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
         <p className="text-sm text-slate-500 font-medium">
           {total} {total === 1 ? 'lead encontrado' : 'leads encontrados'}
         </p>
-        <button
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          Novo Lead
-        </button>
+        <div className="flex items-center gap-2">
+          {leads.length > 0 && (
+            <ConfirmDialog
+              title="Limpar Base de Leads"
+              description="Esta ação excluirá PERMANENTEMENTE todos os leads cadastrados no seu perfil. Esta ação não pode ser desfeita."
+              onConfirm={async () => {
+                await deleteAllLeads();
+              }}
+            >
+              <button
+                className="flex items-center gap-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-sm font-bold px-4 py-2.5 rounded-xl transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                Limpar Base
+              </button>
+            </ConfirmDialog>
+          )}
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+          >
+            <Plus className="w-4 h-4" />
+            Novo Lead
+          </button>
+        </div>
       </div>
 
       {/* Tabela */}

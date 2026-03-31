@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toTitleCase, normalizeLinkedinUrl } from '../utils';
 
 // Regex flexível para o LinkedIn (aceita variações de urls)
 const linkedinRegex = /^(https?:\/\/)?(www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+\/?$/;
@@ -8,7 +9,7 @@ export const ImportRowSchema = z.object({
   fullName: z
     .string({ message: 'O nome é obrigatório' })
     .min(2, 'O nome deve ter pelo menos 2 caracteres')
-    .transform((str) => str.trim()),
+    .transform((str) => toTitleCase(str)),
   email: z
     .string({ message: 'O e-mail é obrigatório' })
     .email('O e-mail informado é inválido')
@@ -16,11 +17,11 @@ export const ImportRowSchema = z.object({
   company: z
     .string()
     .optional()
-    .transform((str) => str?.trim() || undefined),
+    .transform((str) => toTitleCase(str) || undefined),
   jobTitle: z
     .string()
     .optional()
-    .transform((str) => str?.trim() || undefined),
+    .transform((str) => toTitleCase(str) || undefined),
   phone: z
     .string()
     .optional()
@@ -28,20 +29,7 @@ export const ImportRowSchema = z.object({
   linkedinUrl: z
     .string()
     .optional()
-    .transform((str) => {
-      if (!str || str.trim() === '') return undefined;
-      const clean = str.trim();
-      if (linkedinRegex.test(clean)) return clean;
-      
-      // Tentar consertar: se a pessoa colocou só "joaosilva", converte
-      if (!clean.includes('/')) return `https://www.linkedin.com/in/${clean}`;
-      // Se não der pra consertar, mantém, será pego pela validação (se estrito) ou aceito por flexibilidade.
-      // O zod aceita, mas em alguns casos você decide se rejeita ou não. Aqui vamos permitir mas normalizar urls sem Https
-      if (clean.startsWith('linkedin.com') || clean.startsWith('www.linkedin.com')) {
-        return `https://${clean}`;
-      }
-      return clean;
-    }),
+    .transform((str) => normalizeLinkedinUrl(str) || undefined),
   notes: z
     .string()
     .optional()

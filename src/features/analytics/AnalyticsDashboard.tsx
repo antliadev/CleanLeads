@@ -8,7 +8,9 @@ import { Users, Target, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { LEAD_STATUS_MAP, LEAD_SOURCE_MAP } from '@/lib/constants';
 
 const STATUS_COLORS: Record<string, string> = {
-  NOVO: '#6366f1',
+  NOVO: '#3b82f6',
+  AGUARDANDO_CONEXAO: '#0ea5e9',
+  AGUARDANDO_RETORNO: '#f97316',
   CONTATADO: '#f59e0b',
   EM_NEGOCIACAO: '#8b5cf6',
   CONVERTIDO: '#10b981',
@@ -92,10 +94,10 @@ export function AnalyticsDashboard({ data }: Props) {
           )}
         </div>
 
-        {/* Por origem */}
+        {/* Distribuição por Status */}
         <div className="bg-white rounded-3xl border border-slate-200 p-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Por Origem</h3>
-          {sourceChartData.length === 0 ? (
+          <h3 className="text-lg font-bold text-slate-900 mb-6">Distribuição por Status</h3>
+          {statusChartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
               Nenhum dado disponível
             </div>
@@ -103,19 +105,19 @@ export function AnalyticsDashboard({ data }: Props) {
             <>
               <ResponsiveContainer width="100%" height={160}>
                 <PieChart>
-                  <Pie data={sourceChartData} dataKey="value" innerRadius={50} outerRadius={75} paddingAngle={3}>
-                    {sourceChartData.map((_, i) => (
-                      <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
+                  <Pie data={statusChartData} dataKey="value" innerRadius={50} outerRadius={75} paddingAngle={3}>
+                    {statusChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-2 mt-4">
-                {sourceChartData.map((item, i) => (
+                {statusChartData.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ background: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
+                      <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
                       <span className="text-slate-600">{item.name}</span>
                     </div>
                     <span className="font-bold text-slate-900">{item.value}</span>

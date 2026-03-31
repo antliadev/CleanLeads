@@ -182,3 +182,19 @@ export async function deleteLead(id: string): Promise<LeadFormResult> {
     return { success: false, error: err.message || 'Erro ao excluir lead' };
   }
 }
+
+// ═══════════════════════
+// Excluir todos os leads
+// ═══════════════════════
+export async function deleteAllLeads(): Promise<LeadFormResult> {
+  try {
+    const profile = await getAuthProfile();
+    await prisma.lead.deleteMany({ where: { profileId: profile.id } });
+    revalidatePath('/leads');
+    revalidatePath('/analytics');
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao limpar base' };
+  }
+}
+

@@ -81,11 +81,53 @@ export function getGmailComposeUrl(
   if (!email) return null;
 
   const firstName = fullName?.split(' ')[0] || 'parceiro';
+  
+  // Se customSubject for passado, usamos ele tal qual. Senão, usamos o padrão.
   const subject = encodeURIComponent(customSubject || `Parceria Estratégica - ${firstName}`);
-  const body = encodeURIComponent(
-    customBody ||
-      `Olá ${firstName},\n\nVi seu trabalho e gostaria de trocar uma ideia sobre uma possível parceria.\n\nFico no aguardo,\n[Seu Nome]`
-  );
+  
+  // Se customBody for passado, usamos ele tal qual. Senão, usamos o padrão.
+  const body = encodeURIComponent(customBody || `Olá ${firstName},\n\nVi seu trabalho e gostaria de trocar uma ideia sobre uma possível parceria.\n\nFico no aguardo,\n[Seu Nome]`);
 
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
+}
+
+/**
+ * Converte uma string para Title Case, respeitando preposições comuns em PT-BR.
+ */
+export function toTitleCase(str: string | null | undefined): string {
+  if (!str) return '';
+  const minorWords = ['de', 'da', 'do', 'das', 'dos', 'e'];
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(s => s.length > 0)
+    .map((word, index) => {
+      if (index > 0 && minorWords.includes(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+/**
+ * Normaliza uma URL do LinkedIn garantindo o protocolo e tratando slugs.
+ */
+export function normalizeLinkedinUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  let clean = url.trim();
+  if (clean.endsWith('/')) clean = clean.slice(0, -1);
+  
+  if (clean.startsWith('linkedin.com/')) {
+    return `https://www.${clean}`;
+  }
+  if (clean.startsWith('www.linkedin.com/')) {
+    return `https://${clean}`;
+  }
+  if (!clean.startsWith('http')) {
+    if (!clean.includes('.') && !clean.includes('/')) {
+      return `https://www.linkedin.com/in/${clean}`;
+    }
+    return `https://${clean}`;
+  }
+  return clean;
 }

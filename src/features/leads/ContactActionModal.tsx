@@ -28,6 +28,7 @@ export function ContactActionModal({
   templates,
 }: ContactActionModalProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [compiledSubject, setCompiledSubject] = useState('');
   const [compiledText, setCompiledText] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -54,8 +55,10 @@ export function ContactActionModal({
     }
     const template = activeTemplates.find((t) => t.id === selectedTemplateId);
     if (template) {
+      setCompiledSubject(parseTemplate(template.subject || '', lead));
       setCompiledText(parseTemplate(template.body, lead));
     } else {
+      setCompiledSubject('');
       setCompiledText('');
     }
     setCopied(false);
@@ -93,7 +96,7 @@ export function ContactActionModal({
       const gmailUrl = getGmailComposeUrl(
         lead.email,
         lead.fullName,
-        selectedTemplate?.subject ?? undefined,
+        compiledSubject || undefined,
         compiledText || undefined
       );
       if (gmailUrl) {
