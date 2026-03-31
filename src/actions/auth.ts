@@ -24,6 +24,8 @@ const registerSchema = z.object({
 export type AuthResult = {
   success: boolean;
   error?: string;
+  step?: 'code_needed';
+  email?: string;
 };
 
 // ═══════════════════════════════════════════
@@ -43,6 +45,9 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
   });
 
   if (error) {
+    if (error.message.includes('Email not confirmed')) {
+      return { success: false, error: 'O cadastro não foi finalizado. Seu e-mail ainda não foi confirmado.' };
+    }
     return { success: false, error: 'E-mail ou senha incorretos' };
   }
 
@@ -77,6 +82,33 @@ export async function register(_prevState: AuthResult | null, formData: FormData
     return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
   }
 
+  // Não redirecionamos mais, devolvemos step = 'code_needed' para o usuário digitar na tela
+  return { success: true, step: 'code_needed', email: parsed.data.email };
+}
+
+// ═══════════════════════════════════════════
+// Verificar Código (OTP Signup)
+// ═══════════════════════════════════════════
+export async function verifySignupCode(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+  const email = formData.get('email') as string;
+  const code = formData.get('code') as string;
+  
+  if (!email || !code || code.length < 6) {
+    return { success: false, error: 'O código deve ter 6 dígitos', step: 'code_needed', email };
+  }
+
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'signup' // Verifica o token de signup
+  });
+
+  if (error) {
+    return { success: false, error: 'Código incorreto ou expirado. Tente novamente.', step: 'code_needed', email };
+  }
+
+  // Se verificado com sucesso, a sessão já foi logada e armazenada pelo Supabase Middleware
   redirect('/leads');
 }
 

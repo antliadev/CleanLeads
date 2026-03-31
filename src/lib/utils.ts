@@ -170,3 +170,73 @@ export function normalizeLinkedinUrl(url: string | null | undefined): string {
   }
   return clean;
 }
+
+export interface RawCellData {
+  text?: string | null;
+  link?: string | null;
+}
+
+/**
+ * Extrator inteligente de e-mails em células que podem conter Hyperlinks.
+ * Prioriza limpar mailtos, e procura proativamente E-mails na exibição (text) caso o botão aponte para fora.
+ */
+export function extractSmartEmail(cell: any): string | undefined {
+  if (!cell) return undefined;
+
+  let text = '';
+  let link = '';
+
+  if (typeof cell === 'string') {
+    text = cell;
+  } else if (typeof cell === 'number') {
+    text = String(cell);
+  } else if (typeof cell === 'object') {
+    text = cell.text ? String(cell.text) : '';
+    link = cell.link ? String(cell.link) : '';
+  }
+
+  // Regex robusta para capturar o padrão de e-mail em qualquer parte da string
+  const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i;
+
+  // 1. O link tem mailto e um email válido? (Cenário mais forte)
+  if (link.toLowerCase().includes('mailto:')) {
+    const match = link.match(emailRegex);
+    if (match) return match[1].toLowerCase();
+  }
+
+  // 2. O texto exibido é um email válido?
+  const textMatch = text.match(emailRegex);
+  if (textMatch) return textMatch[1].toLowerCase();
+
+  // 3. O link (sem ser mailto) possui email válido?
+  const linkMatch = link.match(emailRegex);
+  if (linkMatch) return linkMatch[1].toLowerCase();
+
+  return undefined;
+}
+
+/**
+ * Extrator seguro de Textos (Nomes, Cargos, etc) para evitar injeções de URLs se a célula possuir Hyperlink acidental.
+ * Foca exclusivamente no valor de exibição da planilha.
+ */
+export function extractSmartText(cell: any): string | undefined {
+  if (!cell) return undefined;
+
+  if (typeof cell === 'string') {
+    return cell.trim();
+  } else if (typeof cell === 'number') {
+    return String(cell).trim();
+  } else if (typeof cell === 'object') {
+    // Prioriza absolutamente o texto visível.
+    if (cell.text !== undefined && cell.text !== null && String(cell.text).trim() !== '') {
+      return String(cell.text).trim();
+    }
+    // Fallback: se houver link sem texto (incomum mas possível), limpa e usa.
+    if (cell.link !== undefined && cell.link !== null) {
+      const cleanLink = String(cell.link).replace(/mailto:/i, '');
+      return cleanLink.trim();
+    }
+  }
+
+  return undefined;
+}

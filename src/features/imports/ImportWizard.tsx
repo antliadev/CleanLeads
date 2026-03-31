@@ -5,6 +5,7 @@ import * as xlsx from 'xlsx';
 import Papa from 'papaparse';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, ChevronRight, X } from 'lucide-react';
 import { validateImportData, LeadImportRow, ImportValidationResult } from '@/lib/validations/lead-import';
+import { extractSmartEmail, extractSmartText } from '@/lib/utils';
 import { processImportChunk } from '@/actions/import';
 import { useRouter } from 'next/navigation';
 
@@ -86,9 +87,9 @@ export function ImportWizard() {
             const cell = worksheet[address];
             if (cell && cell.v !== undefined) {
               const header = headerRow[C - range.s.c];
-              // Se a célula tiver um link real (.l), usamos o Target do link
-              // Caso contrário, usamos o valor visível (.v)
-              row[header] = cell.l?.Target || cell.v;
+              // Em vez de mesclar destrutivamente link || valor, guarda os dois
+              // para uma extração verdadeiramente inteligente posterior:
+              row[header] = { text: cell.v, link: cell.l?.Target };
               hasData = true;
             }
           }
@@ -136,16 +137,16 @@ export function ImportWizard() {
   // STEP 2: MAPEAMENTO E VALIDAÇÃO
   // ────────────────────────────────────────────────────────
   const handleValidate = () => {
-    // Transforma os dados brutos nos objetos esperados usando o mapeamento
+    // Transforma os dados brutos nos objetos esperados usando os extratores inteligentes
     const mappedData = rawData.map(row => {
       return {
-        fullName: mapping.fullName ? row[mapping.fullName] : undefined,
-        email: mapping.email ? row[mapping.email] : undefined,
-        company: mapping.company ? row[mapping.company] : undefined,
-        jobTitle: mapping.jobTitle ? row[mapping.jobTitle] : undefined,
-        phone: mapping.phone ? row[mapping.phone] : undefined,
-        linkedinUrl: mapping.linkedinUrl ? row[mapping.linkedinUrl] : undefined,
-        notes: mapping.notes ? row[mapping.notes] : undefined,
+        fullName: mapping.fullName ? extractSmartText(row[mapping.fullName]) : undefined,
+        email: mapping.email ? extractSmartEmail(row[mapping.email]) : undefined,
+        company: mapping.company ? extractSmartText(row[mapping.company]) : undefined,
+        jobTitle: mapping.jobTitle ? extractSmartText(row[mapping.jobTitle]) : undefined,
+        phone: mapping.phone ? extractSmartText(row[mapping.phone]) : undefined,
+        linkedinUrl: mapping.linkedinUrl ? extractSmartText(row[mapping.linkedinUrl]) : undefined,
+        notes: mapping.notes ? extractSmartText(row[mapping.notes]) : undefined,
       };
     }).filter(row => Object.keys(row).some(k => row[k as keyof typeof row] !== undefined)); // Remove linhas totalmente vazias
 
