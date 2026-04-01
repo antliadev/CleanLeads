@@ -164,14 +164,37 @@ export async function updateLead(
 // ═══════════════════════
 // Atualizar status do lead
 // ═══════════════════════
-export async function updateLeadStatus(id: string, status: LeadStatus): Promise<LeadFormResult> {
+export async function updateLeadStatus(
+  id: string, 
+  status: LeadStatus, 
+  notes?: string
+): Promise<LeadFormResult> {
   try {
     const profile = await getAuthProfile();
+
+    // Se houver nota, buscamos a anterior para concatenar
+    let updateData: any = { status };
+    
+    if (notes && notes.trim()) {
+      const currentLead = await prisma.lead.findUnique({
+        where: { id, profileId: profile.id },
+        select: { notes: true }
+      });
+
+      const timestamp = new Date().toLocaleString('pt-BR');
+      const newNoteEntry = `\n[${timestamp}]: ${notes.trim()}`;
+      updateData.notes = (currentLead?.notes || '') + newNoteEntry;
+    }
+
     await prisma.lead.updateMany({
       where: { id, profileId: profile.id },
-      data: { status },
+      data: updateData,
     });
+
     revalidatePath('/leads');
+    revalidatePath(`/leads/${id}`);
+    revalidatePath('/analytics');
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar status' };

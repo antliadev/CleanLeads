@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Copy, ExternalLink, Check, Mail, MessageCircle, Loader2 } from 'lucide-react';
-import { Template, TemplateChannel } from '@prisma/client';
+import { X, Copy, ExternalLink, Check, Mail, MessageCircle, Loader2, MessageSquare } from 'lucide-react';
+import { Template, TemplateChannel, LeadStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { parseTemplate } from '@/lib/template-parser';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
@@ -34,8 +34,10 @@ export function ContactActionModal({
   const [compiledSubject, setCompiledSubject] = useState('');
   const [compiledText, setCompiledText] = useState('');
   const [copied, setCopied] = useState(false);
-  type ModalView = 'PREPARATION' | 'WAITING' | 'FOLLOWUP';
+  type ModalView = 'PREPARATION' | 'WAITING' | 'FOLLOWUP' | 'FOLLOWUP_QUESTION' | 'FOLLOWUP_NOTE';
   const [view, setView] = useState<ModalView>('PREPARATION');
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
+  const [note, setNote] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Filtra apenas templates ativos para o canal atual
@@ -51,6 +53,8 @@ export function ContactActionModal({
     setSelectedTemplateId(firstTemplate?.id ?? '');
     setCopied(false);
     setView('PREPARATION');
+    setPendingStatus(null);
+    setNote('');
     setIsUpdatingStatus(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, channel]);
@@ -134,13 +138,32 @@ export function ContactActionModal({
     setView('WAITING');
   };
 
-  const handleStatusUpdate = async (status: any) => {
+  const handleStatusSelect = (status: LeadStatus) => {
+    setPendingStatus(status);
+    setView('FOLLOWUP_QUESTION');
+  };
+
+  const handleFinishWithoutNote = async () => {
+    if (!pendingStatus) return;
     setIsUpdatingStatus(true);
     try {
-      await updateLeadStatus(lead.id, status);
+      await updateLeadStatus(lead.id, pendingStatus);
       onClose();
     } catch (err) {
       console.error('Erro ao atualizar status:', err);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleFinishWithNote = async () => {
+    if (!pendingStatus) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateLeadStatus(lead.id, pendingStatus, note);
+      onClose();
+    } catch (err) {
+      console.error('Erro ao atualizar status com nota:', err);
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -168,12 +191,12 @@ export function ContactActionModal({
           <div>
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <ChannelIcon className={`w-5 h-5 ${iconColor}`} />
-              {view === 'WAITING' ? 'Aguardando retorno...' : view === 'FOLLOWUP' ? 'Resultado do Contato' : `Contato via ${channelLabel}`}
+              {view === 'WAITING' ? 'Aguardando retorno...' : view.startsWith('FOLLOWUP') ? 'Resultado do Contato' : `Contato via ${channelLabel}`}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               {view === 'WAITING' 
                 ? `Estamos aguardando você completar o contato com ${lead.fullName.split(' ')[0]}`
-                : view === 'FOLLOWUP'
+                : view.startsWith('FOLLOWUP')
                   ? `Registrar o resultado para ${lead.fullName}`
                   : <>Preparando mensagem para <strong className="text-slate-700">{lead.fullName}</strong></>
               }
@@ -239,7 +262,7 @@ export function ContactActionModal({
                       <button
                         key={key}
                         disabled={isUpdatingStatus}
-                        onClick={() => handleStatusUpdate(key)}
+                        onClick={() => handleStatusSelect(key as LeadStatus)}
                         className={cn(
                           "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group",
                           "hover:border-indigo-500 hover:bg-indigo-50 active:scale-95 disabled:opacity-50",
@@ -261,6 +284,77 @@ export function ContactActionModal({
                   className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   Pular esta etapa
+                </button>
+              </div>
+            </motion.div>
+          ) : view === 'FOLLOWUP_QUESTION' ? (
+            <motion.div
+              key="question"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="p-12 flex flex-col items-center text-center space-y-8"
+            >
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+                <MessageSquare className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-slate-800">Quer adicionar uma anotação?</h3>
+                <p className="text-slate-500">Isso ajuda a lembrar o que foi conversado ou o motivo do resultado.</p>
+              </div>
+              <div className="flex items-center gap-4 w-full max-w-sm">
+                <button
+                  onClick={handleFinishWithoutNote}
+                  disabled={isUpdatingStatus}
+                  className="flex-1 px-6 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                >
+                  Não
+                </button>
+                <button
+                  onClick={() => setView('FOLLOWUP_NOTE')}
+                  disabled={isUpdatingStatus}
+                  className="flex-1 px-6 py-4 rounded-2xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100"
+                >
+                  Sim
+                </button>
+              </div>
+            </motion.div>
+          ) : view === 'FOLLOWUP_NOTE' ? (
+            <motion.div
+              key="note"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="p-8 space-y-6"
+            >
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-slate-800">O que aconteceu no contato?</h3>
+                <p className="text-sm text-slate-500">Sua nota será salva no histórico de <strong>{lead.fullName}</strong></p>
+              </div>
+              <textarea
+                autoFocus
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ex: Cliente demonstrou interesse mas pediu para ligar semana que vem..."
+                rows={5}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 outline-none focus:border-indigo-500 text-slate-700 font-medium transition-colors"
+                disabled={isUpdatingStatus}
+              />
+              <div className="flex items-center gap-3 justify-end">
+                <button
+                  onClick={() => setView('FOLLOWUP_QUESTION')}
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-400 hover:text-slate-600"
+                  disabled={isUpdatingStatus}
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={handleFinishWithNote}
+                  disabled={!note.trim() || isUpdatingStatus}
+                  className="px-8 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-indigo-200"
+                >
+                  {isUpdatingStatus && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Salvar e Finalizar
                 </button>
               </div>
             </motion.div>
