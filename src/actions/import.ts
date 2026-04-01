@@ -122,13 +122,15 @@ export async function checkLeadsDuplicity(identifiers: { email?: string, linkedi
   const emails = identifiers.map(i => i.email).filter(Boolean) as string[];
   const linkedins = identifiers.map(i => i.linkedinUrl).filter(Boolean) as string[];
 
+  if (emails.length === 0 && linkedins.length === 0) return [];
+
   // Busca leads que já existem com os mesmos e-mails ou linkedinUrls no perfil do usuário
   const existingLeads = await prisma.lead.findMany({
     where: {
       profileId: profile.id,
       OR: [
-        { email: { in: emails } },
-        { linkedinUrl: { in: linkedins } },
+        { email: { in: emails.length > 0 ? emails : ['__none__'] } },
+        { linkedinUrl: { in: linkedins.length > 0 ? linkedins : ['__none__'] } },
       ],
     },
     select: {

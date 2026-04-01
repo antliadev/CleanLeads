@@ -135,16 +135,16 @@ export function ImportWizard() {
   };
 
   // ────────────────────────────────────────────────────────
-  // STEP 2: MAPEAMENTO E VALIDAÇÃO
+  // STEP 2: MAPEAMENTO E VALIDAÇÃO (OTIMIZADO)
   // ────────────────────────────────────────────────────────
   const handleValidate = async () => {
     setIsValidating(true);
+    setValidation(null); // Limpa anterior
+    
     try {
-      // 1. Transforma os dados brutos nos objetos esperados usando os extratores inteligentes
-      const mappedData = rawData.map((row, index) => {
+      // 1. Mapeamento dos dados
+      const mappedData = rawData.map(row => {
         return {
-          _originalRow: index + 2, // para rastrear de volta em caso de duplicidade
-          _originalData: row,
           fullName: mapping.fullName ? extractSmartText(row[mapping.fullName]) : undefined,
           email: mapping.email ? extractSmartEmail(row[mapping.email]) : undefined,
           company: mapping.company ? extractSmartText(row[mapping.company]) : undefined,
@@ -153,57 +153,61 @@ export function ImportWizard() {
           linkedinUrl: mapping.linkedinUrl ? extractSmartText(row[mapping.linkedinUrl]) : undefined,
           notes: mapping.notes ? extractSmartText(row[mapping.notes]) : undefined,
         };
-      }).filter(row => Object.keys(row).some(k => !k.startsWith('_') && row[k as keyof typeof row] !== undefined));
+      }).filter(row => Object.keys(row).some(k => row[k as keyof typeof row] !== undefined));
 
-      // 2. Validação local do Zod
+      // 2. Validação local (Zod)
       const result = validateImportData(mappedData);
 
       if (result.validLeads.length > 0) {
-        // 3. Validação de Duplicidade no Servidor
-        const identifiers = result.validLeads.map(lead => ({
-          email: lead.email,
-          linkedinUrl: lead.linkedinUrl
-        }));
-
-        const existingLeads = await checkLeadsDuplicity(identifiers);
+        // 3. Validação de Duplicidade em Lotes (BATCHES)
+        const BATCH_SIZE = 250;
+        const leads = result.validLeads;
+        const totalBatches = Math.ceil(leads.length / BATCH_SIZE);
         
-        if (existingLeads.length > 0) {
-          const duplicatesEmail = new Set(existingLeads.map(ex => ex.email?.toLowerCase()).filter(Boolean));
-          const duplicatesLinkedin = new Set(existingLeads.map(ex => ex.linkedinUrl?.toLowerCase()).filter(Boolean));
+        const duplicatesEmail = new Set<string>();
+        const duplicatesLinkedin = new Set<string>();
 
-          // Filtrar os leads válidos e mover duplicados para erros
-          const realValidLeads: LeadImportRow[] = [];
+        for (let i = 0; i < totalBatches; i++) {
+          const chunk = leads.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+          const identifiers = chunk.map(l => ({ email: l.email, linkedinUrl: l.linkedinUrl }));
           
-          result.validLeads.forEach((lead) => {
-             const isDup = (lead.email && duplicatesEmail.has(lead.email.toLowerCase())) || 
-                          (lead.linkedinUrl && duplicatesLinkedin.has(lead.linkedinUrl.toLowerCase()));
-             
-             if (isDup) {
-                // Encontra a linha original para a mensagem de erro
-                const original = (mappedData as any).find((m: any) => 
-                  (m.email === lead.email && lead.email) || 
-                  (m.linkedinUrl === lead.linkedinUrl && lead.linkedinUrl)
-                );
+          const existing = await checkLeadsDuplicity(identifiers);
+          existing.forEach(ex => {
+            if (ex.email) duplicatesEmail.add(ex.email.toLowerCase());
+            if (ex.linkedinUrl) duplicatesLinkedin.add(ex.linkedinUrl.toLowerCase());
+          });
+        }
 
-                result.invalidRows.push({
-                   row: original?._originalRow || 0,
-                   data: original?._originalData || {},
-                   errors: ['Duplicidade - contato já cadastrado na sua base de leads']
-                });
-             } else {
-                realValidLeads.push(lead);
-             }
+        // 4. Filtragem Otimizada (O(N) usando Sets)
+        if (duplicatesEmail.size > 0 || duplicatesLinkedin.size > 0) {
+          const finalValidLeads: LeadImportRow[] = [];
+          
+          // Re-mapeia para encontrar a linha original corretamente
+          leads.forEach((lead, index) => {
+            const isDup = (lead.email && duplicatesEmail.has(lead.email.toLowerCase())) || 
+                         (lead.linkedinUrl && duplicatesLinkedin.has(lead.linkedinUrl.toLowerCase()));
+            
+            if (isDup) {
+              result.invalidRows.push({
+                row: index + 2, // Ajuste simples de linha
+                data: mappedData[index],
+                errors: ['Duplicidade - contato já cadastrado na sua base de leads']
+              });
+            } else {
+              finalValidLeads.push(lead);
+            }
           });
 
-          result.validLeads = realValidLeads;
-          // Ordenar invalidRows por número da linha
+          result.validLeads = finalValidLeads;
           result.invalidRows.sort((a, b) => a.row - b.row);
         }
       }
 
       setValidation(result);
     } catch (err) {
-      console.error('Erro na validação:', err);
+      console.error('Erro crítico na validação:', err);
+      // Fallback para não quebrar a página
+      alert('Ocorreu um erro ao validar os dados no servidor. Tente reduzir o tamanho do arquivo ou verifique sua conexão.');
     } finally {
       setIsValidating(false);
     }
