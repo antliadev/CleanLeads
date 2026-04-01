@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useActionState } from 'react';
 import { X, Loader2, Eye, Sparkles } from 'lucide-react';
 import { createTemplate, updateTemplate, improveTemplateText, type TemplateFormResult } from '@/actions/templates';
@@ -41,6 +41,31 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
   const [body, setBody] = useState(template?.body ?? '');
   const [showPreview, setShowPreview] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const variables = [
+    { label: 'Nome', value: '{{firstName}}' },
+    { label: 'Empresa', value: '{{company}}' },
+    { label: 'Cargo', value: '{{jobTitle}}' },
+  ];
+
+  const handleInsertVariable = (variable: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentText = body;
+    const newText = currentText.substring(0, start) + variable + currentText.substring(end);
+
+    setBody(newText);
+
+    // Ajusta o cursor para logo após a variável inserida
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + variable.length, start + variable.length);
+    }, 0);
+  };
 
   // Fecha modal APÓS o ciclo de render (evita setState-during-render)
   useEffect(() => {
@@ -184,6 +209,7 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
                   </button>
                 </div>
                 <textarea
+                  ref={textareaRef}
                   name="body"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
@@ -192,9 +218,18 @@ export function TemplateForm({ template, onClose }: TemplateFormProps) {
                   className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all resize-none"
                   placeholder={`Olá {{firstName}},\n\nVi seu trabalho na {{company}}...`}
                 />
-                <p className="text-xs text-slate-400 mt-1.5">
-                  Use {'{{firstName}}'}, {'{{company}}'}, {'{{jobTitle}}'} para personalizar
-                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {variables.map((v) => (
+                    <button
+                      key={v.value}
+                      type="button"
+                      onClick={() => handleInsertVariable(v.value)}
+                      className="text-[11px] font-bold bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200 transition-all active:scale-95"
+                    >
+                      + {v.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Ativo */}
