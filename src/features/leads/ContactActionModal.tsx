@@ -34,7 +34,8 @@ export function ContactActionModal({
   const [compiledSubject, setCompiledSubject] = useState('');
   const [compiledText, setCompiledText] = useState('');
   const [copied, setCopied] = useState(false);
-  const [isWaitingFollowUp, setIsWaitingFollowUp] = useState(false);
+  type ModalView = 'PREPARATION' | 'WAITING' | 'FOLLOWUP';
+  const [view, setView] = useState<ModalView>('PREPARATION');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Filtra apenas templates ativos para o canal atual
@@ -49,27 +50,25 @@ export function ContactActionModal({
     const firstTemplate = activeTemplates[0];
     setSelectedTemplateId(firstTemplate?.id ?? '');
     setCopied(false);
-    setIsWaitingFollowUp(false);
+    setView('PREPARATION');
     setIsUpdatingStatus(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, channel]);
 
   // Listener para capturar o retorno do usuário à aba após abrir link externo
   useEffect(() => {
-    if (!isWaitingFollowUp || !isOpen) return;
+    if (view !== 'WAITING' || !isOpen) return;
 
     const handleWindowFocus = () => {
       // Quando o usuário volta o foco para a janela, assume que terminou o contato
-      // Pequeno delay para garantir que a transição visual seja fluida
       setTimeout(() => {
-        setIsWaitingFollowUp(false);
-        // Só muda de tela se ainda estivermos no modal e o lead existir
+        setView('FOLLOWUP');
       }, 500);
     };
 
     window.addEventListener('focus', handleWindowFocus);
     return () => window.removeEventListener('focus', handleWindowFocus);
-  }, [isWaitingFollowUp, isOpen]);
+  }, [view, isOpen]);
 
   // Quando muda o template selecionado, recompila o texto substituindo as variáveis
   useEffect(() => {
@@ -108,7 +107,6 @@ export function ContactActionModal({
     await handleCopy();
 
     if (channel === 'LINKEDIN') {
-      // Usa a URL real do lead cadastrada — sem construção artificial
       if (lead.linkedinUrl) {
         const url = lead.linkedinUrl.startsWith('http')
           ? lead.linkedinUrl
@@ -116,7 +114,6 @@ export function ContactActionModal({
         window.open(url, '_blank', 'noopener,noreferrer');
       }
     } else if (channel === 'EMAIL' && lead.email) {
-      // Abre o Gmail com a composição já preenchida
       const gmailUrl = getGmailComposeUrl(
         lead.email,
         lead.fullName,
@@ -127,7 +124,6 @@ export function ContactActionModal({
         window.open(gmailUrl, '_blank', 'noopener,noreferrer');
       }
     } else if (channel === 'WHATSAPP' && lead.phone) {
-      // Abre o WhatsApp com a mensagem personalizada
       const whatsappUrl = getWhatsAppUrl(lead.phone, compiledText);
       if (whatsappUrl) {
         window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
@@ -135,7 +131,7 @@ export function ContactActionModal({
     }
 
     // Ativa o modo de espera pelo retorno do usuário
-    setIsWaitingFollowUp(true);
+    setView('WAITING');
   };
 
   const handleStatusUpdate = async (status: any) => {
@@ -161,7 +157,6 @@ export function ContactActionModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
-      // Fechar ao clicar fora do modal
       onClick={onClose}
     >
       <div
@@ -173,16 +168,18 @@ export function ContactActionModal({
           <div>
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <ChannelIcon className={`w-5 h-5 ${iconColor}`} />
-              {isWaitingFollowUp ? 'Aguardando retorno...' : `Contato via ${channelLabel}`}
+              {view === 'WAITING' ? 'Aguardando retorno...' : view === 'FOLLOWUP' ? 'Resultado do Contato' : `Contato via ${channelLabel}`}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              {isWaitingFollowUp 
+              {view === 'WAITING' 
                 ? `Estamos aguardando você completar o contato com ${lead.fullName.split(' ')[0]}`
-                : <>Preparando mensagem para <strong className="text-slate-700">{lead.fullName}</strong></>
+                : view === 'FOLLOWUP'
+                  ? `Registrar o resultado para ${lead.fullName}`
+                  : <>Preparando mensagem para <strong className="text-slate-700">{lead.fullName}</strong></>
               }
             </p>
           </div>
-          {!isWaitingFollowUp && (
+          {view === 'PREPARATION' && (
             <button
               onClick={onClose}
               className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
@@ -193,7 +190,7 @@ export function ContactActionModal({
         </div>
 
         <AnimatePresence mode="wait">
-          {isWaitingFollowUp ? (
+          {view === 'WAITING' ? (
             <motion.div
               key="waiting"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -214,17 +211,59 @@ export function ContactActionModal({
                 </p>
               </div>
               <button 
-                onClick={() => setIsWaitingFollowUp(false)}
+                onClick={() => setView('FOLLOWUP')}
                 className="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-4"
               >
                 Voltei agora, atualizar status
               </button>
             </motion.div>
-          ) : !isWaitingFollowUp && lead.status !== 'NOVO' && lead.status !== 'AGUARDANDO_CONEXAO' && lead.status !== 'AGUARDANDO_RETORNO' && !selectedTemplateId ? (
-            // Fallback para quando o componente precisa de um estado limpo
-            <div className="p-12 text-center text-slate-400">Carregando...</div>
-          ) : isWaitingFollowUp === false && lead.status !== 'NOVO' && lead.status !== 'AGUARDANDO_CONEXAO' && lead.status !== 'AGUARDANDO_RETORNO' && !compiledText && activeTemplates.length === 0 ? (
-             <div className="p-12 text-center text-slate-400">Nenhum template disponível.</div>
+          ) : view === 'FOLLOWUP' ? (
+            <motion.div
+              key="followup"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="p-8 space-y-8"
+            >
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-black text-slate-800">Como foi o contato?</h3>
+                <p className="text-slate-500">Selecione o novo status para <strong>{lead.fullName}</strong></p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(LEAD_STATUS_MAP)
+                  .filter(([key]) => ['AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'PERDIDO', 'VITORIA'].includes(key))
+                  .map(([key, config]) => {
+                    const Icon = config.icon;
+                    return (
+                      <button
+                        key={key}
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusUpdate(key)}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group",
+                          "hover:border-indigo-500 hover:bg-indigo-50 active:scale-95 disabled:opacity-50",
+                          config.color.includes('border-') ? config.color.split(' ').find(c => c.startsWith('border-')) : 'border-slate-100'
+                        )}
+                      >
+                        <div className={cn("p-4 rounded-2xl mb-3 transition-colors", config.color.split(' ')[0])}>
+                          <Icon className="w-8 h-8" />
+                        </div>
+                        <span className="font-bold text-slate-700">{config.label}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              <div className="flex justify-center">
+                <button 
+                  onClick={onClose}
+                  className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Pular esta etapa
+                </button>
+              </div>
+            </motion.div>
           ) : (
             <motion.div
               key="contact"
@@ -232,155 +271,106 @@ export function ContactActionModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              {/* Se o lead foi marcado como em fluxo, mas voltamos, mostramos as opções de status */}
-              {isWaitingFollowUp === false && lead.status !== 'NOVO' && lead.status !== 'AGUARDANDO_CONEXAO' && (
-                <div className="p-8 space-y-8">
-                  <div className="text-center space-y-2">
-                    <h3 className="text-2xl font-black text-slate-800">Como foi o contato?</h3>
-                    <p className="text-slate-500">Selecione o novo status para <strong>{lead.fullName}</strong></p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    {Object.entries(LEAD_STATUS_MAP)
-                      .filter(([key]) => ['AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'PERDIDO'].includes(key))
-                      .map(([key, config]) => {
-                        const Icon = config.icon;
-                        return (
-                          <button
-                            key={key}
-                            disabled={isUpdatingStatus}
-                            onClick={() => handleStatusUpdate(key)}
-                            className={cn(
-                              "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group",
-                              "hover:border-indigo-500 hover:bg-indigo-50 active:scale-95 disabled:opacity-50",
-                              config.color.split(' ')[2].replace('border-', 'border-') // Usa a cor do mapa
-                            )}
-                          >
-                            <div className={cn("p-4 rounded-2xl mb-3 transition-colors", config.color.split(' ')[0])}>
-                              <Icon className="w-8 h-8" />
-                            </div>
-                            <span className="font-bold text-slate-700">{config.label}</span>
-                          </button>
-                        );
-                      })}
-                  </div>
-
-                  <div className="flex justify-center">
-                    <button 
-                      onClick={onClose}
-                      className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+              <div className="p-6 space-y-6">
+                {/* Seleção de Template */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Escolha um Template
+                  </label>
+                  {activeTemplates.length > 0 ? (
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-medium transition-colors"
                     >
-                      Pular esta etapa
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Corpo de seleção de Template - Só exibe se NÃO estiver em follow-up e o status for inicial */}
-              {(lead.status === 'NOVO' || lead.status === 'AGUARDANDO_CONEXAO' || lead.status === 'AGUARDANDO_RETORNO') && (
-                <>
-                  <div className="p-6 space-y-6">
-                    {/* Seleção de Template */}
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">
-                        Escolha um Template
-                      </label>
-                      {activeTemplates.length > 0 ? (
-                        <select
-                          value={selectedTemplateId}
-                          onChange={(e) => setSelectedTemplateId(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-medium transition-colors"
-                        >
-                          <option value="" disabled>
-                            Selecione um template de {channelLabel}
-                          </option>
-                          {activeTemplates.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-sm">
-                          Nenhum template ativo encontrado para {channelLabel}. Crie um na guia Templates.
-                        </div>
-                      )}
+                      <option value="" disabled>
+                        Selecione um template de {channelLabel}
+                      </option>
+                      {activeTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 text-sm">
+                      Nenhum template ativo encontrado para {channelLabel}. Crie um na guia Templates.
                     </div>
+                  )}
+                </div>
 
-                    {/* Preview da Mensagem Personalizada */}
-                    {selectedTemplateId && (
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-bold text-slate-700">
-                            Mensagem Personalizada
-                          </label>
-                          <button
-                            onClick={handleCopy}
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
-                          >
-                            {copied ? (
-                              <>
-                                <Check className="w-3 h-3" /> Copiado!
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" /> Copiar apenas o texto
-                              </>
-                            )}
-                          </button>
-                        </div>
-                        <textarea
-                          value={compiledText}
-                          onChange={(e) => setCompiledText(e.target.value)}
-                          rows={6}
-                          className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-slate-700 font-medium font-sans leading-relaxed resize-y transition-colors"
-                          placeholder="A mensagem será renderizada aqui..."
-                        />
-                        <p className="text-xs text-slate-400 mt-2">
-                          As variáveis do template foram preenchidas com os dados de{' '}
-                          <strong>{lead.fullName}</strong>. Você pode editar o texto antes de copiar.
-                        </p>
-                      </div>
-                    )}
+                {/* Preview da Mensagem Personalizada */}
+                {selectedTemplateId && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-bold text-slate-700">
+                        Mensagem Personalizada
+                      </label>
+                      <button
+                        onClick={handleCopy}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 transition-colors"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-3 h-3" /> Copiado!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" /> Copiar apenas o texto
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <textarea
+                      value={compiledText}
+                      onChange={(e) => setCompiledText(e.target.value)}
+                      rows={6}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-slate-700 font-medium font-sans leading-relaxed resize-y transition-colors"
+                      placeholder="A mensagem será renderizada aqui..."
+                    />
+                    <p className="text-xs text-slate-400 mt-2">
+                      As variáveis do template foram preenchidas com os dados de{' '}
+                      <strong>{lead.fullName}</strong>. Você pode editar o texto antes de copiar.
+                    </p>
                   </div>
+                )}
+              </div>
 
-                  {/* Rodapé com Ações */}
-                  <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
-                    >
-                      Cancelar
-                    </button>
+              {/* Rodapé com Ações */}
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  Cancelar
+                </button>
 
-                    <button
-                      onClick={handleCopyAndGo}
-                      disabled={!compiledText || isUpdatingStatus}
-                      className="px-6 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-200"
-                    >
-                      {isUpdatingStatus ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : !compiledText ? (
-                        'Escolha um template'
-                      ) : copied ? (
-                        <>
-                          <Check className="w-4 h-4" /> Copiado!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          {isLinkedIn 
-                            ? 'Copiar & Abrir LinkedIn' 
-                            : isWhatsApp 
-                              ? 'Copiar & Abrir WhatsApp' 
-                              : 'Copiar & Abrir Gmail'}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
-              )}
+                <button
+                  onClick={handleCopyAndGo}
+                  disabled={!compiledText || isUpdatingStatus}
+                  className="px-6 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-indigo-200"
+                >
+                  {isUpdatingStatus ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : !compiledText ? (
+                    'Escolha um template'
+                  ) : copied ? (
+                    <>
+                      <Check className="w-4 h-4" /> Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      {isLinkedIn 
+                        ? 'Copiar & Abrir LinkedIn' 
+                        : isWhatsApp 
+                          ? 'Copiar & Abrir WhatsApp' 
+                          : 'Copiar & Abrir Gmail'}
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
