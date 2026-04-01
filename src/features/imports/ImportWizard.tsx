@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import * as xlsx from 'xlsx';
 import Papa from 'papaparse';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, ChevronRight, X, Loader2 } from 'lucide-react';
 import { validateImportData, LeadImportRow, ImportValidationResult } from '@/lib/validations/lead-import';
 import { extractSmartEmail, extractSmartText } from '@/lib/utils';
-import { processImportChunk } from '@/actions/import';
+import { processImportChunk, checkLeadsDuplicity } from '@/actions/import';
 import { useRouter } from 'next/navigation';
 
 export function ImportWizard() {
@@ -35,6 +35,7 @@ export function ImportWizard() {
   
   // Submit state
   const [processing, setProcessing] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [progress, setProgress] = useState(0);
 
   // ────────────────────────────────────────────────────────
@@ -136,22 +137,76 @@ export function ImportWizard() {
   // ────────────────────────────────────────────────────────
   // STEP 2: MAPEAMENTO E VALIDAÇÃO
   // ────────────────────────────────────────────────────────
-  const handleValidate = () => {
-    // Transforma os dados brutos nos objetos esperados usando os extratores inteligentes
-    const mappedData = rawData.map(row => {
-      return {
-        fullName: mapping.fullName ? extractSmartText(row[mapping.fullName]) : undefined,
-        email: mapping.email ? extractSmartEmail(row[mapping.email]) : undefined,
-        company: mapping.company ? extractSmartText(row[mapping.company]) : undefined,
-        jobTitle: mapping.jobTitle ? extractSmartText(row[mapping.jobTitle]) : undefined,
-        phone: mapping.phone ? extractSmartText(row[mapping.phone]) : undefined,
-        linkedinUrl: mapping.linkedinUrl ? extractSmartText(row[mapping.linkedinUrl]) : undefined,
-        notes: mapping.notes ? extractSmartText(row[mapping.notes]) : undefined,
-      };
-    }).filter(row => Object.keys(row).some(k => row[k as keyof typeof row] !== undefined)); // Remove linhas totalmente vazias
+  const handleValidate = async () => {
+    setIsValidating(true);
+    try {
+      // 1. Transforma os dados brutos nos objetos esperados usando os extratores inteligentes
+      const mappedData = rawData.map((row, index) => {
+        return {
+          _originalRow: index + 2, // para rastrear de volta em caso de duplicidade
+          _originalData: row,
+          fullName: mapping.fullName ? extractSmartText(row[mapping.fullName]) : undefined,
+          email: mapping.email ? extractSmartEmail(row[mapping.email]) : undefined,
+          company: mapping.company ? extractSmartText(row[mapping.company]) : undefined,
+          jobTitle: mapping.jobTitle ? extractSmartText(row[mapping.jobTitle]) : undefined,
+          phone: mapping.phone ? extractSmartText(row[mapping.phone]) : undefined,
+          linkedinUrl: mapping.linkedinUrl ? extractSmartText(row[mapping.linkedinUrl]) : undefined,
+          notes: mapping.notes ? extractSmartText(row[mapping.notes]) : undefined,
+        };
+      }).filter(row => Object.keys(row).some(k => !k.startsWith('_') && row[k as keyof typeof row] !== undefined));
 
-    const result = validateImportData(mappedData);
-    setValidation(result);
+      // 2. Validação local do Zod
+      const result = validateImportData(mappedData);
+
+      if (result.validLeads.length > 0) {
+        // 3. Validação de Duplicidade no Servidor
+        const identifiers = result.validLeads.map(lead => ({
+          email: lead.email,
+          linkedinUrl: lead.linkedinUrl
+        }));
+
+        const existingLeads = await checkLeadsDuplicity(identifiers);
+        
+        if (existingLeads.length > 0) {
+          const duplicatesEmail = new Set(existingLeads.map(ex => ex.email?.toLowerCase()).filter(Boolean));
+          const duplicatesLinkedin = new Set(existingLeads.map(ex => ex.linkedinUrl?.toLowerCase()).filter(Boolean));
+
+          // Filtrar os leads válidos e mover duplicados para erros
+          const realValidLeads: LeadImportRow[] = [];
+          
+          result.validLeads.forEach((lead) => {
+             const isDup = (lead.email && duplicatesEmail.has(lead.email.toLowerCase())) || 
+                          (lead.linkedinUrl && duplicatesLinkedin.has(lead.linkedinUrl.toLowerCase()));
+             
+             if (isDup) {
+                // Encontra a linha original para a mensagem de erro
+                const original = (mappedData as any).find((m: any) => 
+                  (m.email === lead.email && lead.email) || 
+                  (m.linkedinUrl === lead.linkedinUrl && lead.linkedinUrl)
+                );
+
+                result.invalidRows.push({
+                   row: original?._originalRow || 0,
+                   data: original?._originalData || {},
+                   errors: ['Duplicidade - contato já cadastrado na sua base de leads']
+                });
+             } else {
+                realValidLeads.push(lead);
+             }
+          });
+
+          result.validLeads = realValidLeads;
+          // Ordenar invalidRows por número da linha
+          result.invalidRows.sort((a, b) => a.row - b.row);
+        }
+      }
+
+      setValidation(result);
+    } catch (err) {
+      console.error('Erro na validação:', err);
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   // ────────────────────────────────────────────────────────
@@ -239,9 +294,17 @@ export function ImportWizard() {
           <div className="flex justify-end pt-4 border-t border-slate-100">
             <button 
               onClick={handleValidate}
-              className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-colors"
+              disabled={isValidating}
+              className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center gap-2"
             >
-              Validar Dados
+              {isValidating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Validando na base...
+                </>
+              ) : (
+                'Validar Dados'
+              )}
             </button>
           </div>
 

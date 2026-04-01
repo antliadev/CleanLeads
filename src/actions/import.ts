@@ -105,3 +105,37 @@ export async function processImportChunk(validLeads: LeadImportRow[], batchId: s
 
   return results;
 }
+
+// ────────────────────────────────────────────────────────
+// CHECAR DUPLICIDADE (Usado na validação do Wizard)
+// ────────────────────────────────────────────────────────
+export async function checkLeadsDuplicity(identifiers: { email?: string, linkedinUrl?: string }[]) {
+  const supabase = await createServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Não autenticado');
+
+  const profile = await prisma.profile.findUnique({
+    where: { authUid: user.id },
+  });
+  if (!profile) throw new Error('Perfil não encontrado');
+
+  const emails = identifiers.map(i => i.email).filter(Boolean) as string[];
+  const linkedins = identifiers.map(i => i.linkedinUrl).filter(Boolean) as string[];
+
+  // Busca leads que já existem com os mesmos e-mails ou linkedinUrls no perfil do usuário
+  const existingLeads = await prisma.lead.findMany({
+    where: {
+      profileId: profile.id,
+      OR: [
+        { email: { in: emails } },
+        { linkedinUrl: { in: linkedins } },
+      ],
+    },
+    select: {
+      email: true,
+      linkedinUrl: true
+    }
+  });
+
+  return existingLeads;
+}
