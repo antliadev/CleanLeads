@@ -183,29 +183,29 @@ export function ContactActionModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-2xl overflow-hidden transition-colors"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 transition-colors">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <ChannelIcon className={`w-5 h-5 ${iconColor}`} />
               {view === 'WAITING' ? 'Aguardando retorno...' : view.startsWith('FOLLOWUP') ? 'Resultado do Contato' : `Contato via ${channelLabel}`}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {view === 'WAITING' 
                 ? `Estamos aguardando você completar o contato com ${lead.fullName.split(' ')[0]}`
                 : view.startsWith('FOLLOWUP')
                   ? `Registrar o resultado para ${lead.fullName}`
-                  : <>Preparando mensagem para <strong className="text-slate-700">{lead.fullName}</strong></>
+                  : <>Preparando mensagem para <strong className="text-slate-700 dark:text-slate-300">{lead.fullName}</strong></>
               }
             </p>
           </div>
           {view === 'PREPARATION' && (
             <button
               onClick={onClose}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -223,13 +223,13 @@ export function ContactActionModal({
             >
               <div className="relative">
                 <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-25" />
-                <div className={`p-6 rounded-full bg-indigo-100 ${iconColor} relative`}>
+                <div className={`p-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 ${iconColor} relative`}>
                   <ChannelIcon className="w-12 h-12" />
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-800">Contato aberto!</h3>
-                <p className="text-slate-500 max-w-sm">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Contato aberto!</h3>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm">
                   Complete o envio na nova guia. Ao voltar para cá, registraremos o resultado.
                 </p>
               </div>
@@ -249,8 +249,8 @@ export function ContactActionModal({
               className="p-8 space-y-8"
             >
               <div className="text-center space-y-2">
-                <h3 className="text-2xl font-black text-slate-800">Como foi o contato?</h3>
-                <p className="text-slate-500">Selecione o novo status para <strong>{lead.fullName}</strong></p>
+                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Como foi o contato?</h3>
+                <p className="text-slate-500 dark:text-slate-400">Selecione o novo status para <strong className="dark:text-slate-300">{lead.fullName}</strong></p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -265,14 +265,14 @@ export function ContactActionModal({
                         onClick={() => handleStatusSelect(key as LeadStatus)}
                         className={cn(
                           "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group",
-                          "hover:border-indigo-500 hover:bg-indigo-50 active:scale-95 disabled:opacity-50",
-                          config.color.includes('border-') ? config.color.split(' ').find(c => c.startsWith('border-')) : 'border-slate-100'
+                          "hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 disabled:opacity-50",
+                          config.color.includes('border-') ? config.color.split(' ').find(c => c.startsWith('border-')) : 'border-slate-100 dark:border-slate-800'
                         )}
                       >
                         <div className={cn("p-4 rounded-2xl mb-3 transition-colors", config.color.split(' ')[0])}>
                           <Icon className="w-8 h-8" />
                         </div>
-                        <span className="font-bold text-slate-700">{config.label}</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300 group-hover:dark:text-indigo-300">{config.label}</span>
                       </button>
                     );
                   })}
@@ -295,18 +295,18 @@ export function ContactActionModal({
               exit={{ opacity: 0, x: -20 }}
               className="p-12 flex flex-col items-center text-center space-y-8"
             >
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-2xl flex items-center justify-center transition-colors">
                 <MessageSquare className="w-8 h-8" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-800">Quer adicionar uma anotação?</h3>
-                <p className="text-slate-500">Isso ajuda a lembrar o que foi conversado ou o motivo do resultado.</p>
+                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100">Quer adicionar uma anotação?</h3>
+                <p className="text-slate-500 dark:text-slate-400">Isso ajuda a lembrar o que foi conversado ou o motivo do resultado.</p>
               </div>
               <div className="flex items-center gap-4 w-full max-w-sm">
                 <button
                   onClick={handleFinishWithoutNote}
                   disabled={isUpdatingStatus}
-                  className="flex-1 px-6 py-4 rounded-2xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                  className="flex-1 px-6 py-4 rounded-2xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
                 >
                   Não
                 </button>
@@ -328,8 +328,8 @@ export function ContactActionModal({
               className="p-8 space-y-6"
             >
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-800">O que aconteceu no contato?</h3>
-                <p className="text-sm text-slate-500">Sua nota será salva no histórico de <strong>{lead.fullName}</strong></p>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">O que aconteceu no contato?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Sua nota será salva no histórico de <strong className="dark:text-slate-300">{lead.fullName}</strong></p>
               </div>
               <textarea
                 autoFocus
@@ -337,7 +337,7 @@ export function ContactActionModal({
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ex: Cliente demonstrou interesse mas pediu para ligar semana que vem..."
                 rows={5}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 outline-none focus:border-indigo-500 text-slate-700 font-medium transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-100 font-medium transition-colors"
                 disabled={isUpdatingStatus}
               />
               <div className="flex items-center gap-3 justify-end">
@@ -368,14 +368,14 @@ export function ContactActionModal({
               <div className="p-6 space-y-6">
                 {/* Seleção de Template */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
                     Escolha um Template
                   </label>
                   {activeTemplates.length > 0 ? (
                     <select
                       value={selectedTemplateId}
                       onChange={(e) => setSelectedTemplateId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-medium transition-colors"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 font-medium transition-colors"
                     >
                       <option value="" disabled>
                         Selecione um template de {channelLabel}
@@ -397,7 +397,7 @@ export function ContactActionModal({
                 {selectedTemplateId && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-bold text-slate-700">
+                      <label className="text-sm font-bold text-slate-700 dark:text-slate-300">
                         Mensagem Personalizada
                       </label>
                       <button
@@ -419,23 +419,23 @@ export function ContactActionModal({
                       value={compiledText}
                       onChange={(e) => setCompiledText(e.target.value)}
                       rows={6}
-                      className="w-full bg-white border border-slate-200 rounded-xl p-4 outline-none focus:border-indigo-500 text-slate-700 font-medium font-sans leading-relaxed resize-y transition-colors"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 outline-none focus:border-indigo-500 text-slate-700 dark:text-slate-300 font-medium font-sans leading-relaxed resize-y transition-colors"
                       placeholder="A mensagem será renderizada aqui..."
                     />
-                    <p className="text-xs text-slate-400 mt-2">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
                       As variáveis do template foram preenchidas com os dados de{' '}
-                      <strong>{lead.fullName}</strong>. Você pode editar o texto antes de copiar.
+                      <strong className="dark:text-slate-400">{lead.fullName}</strong>. Você pode editar o texto antes de copiar.
                     </p>
                   </div>
                 )}
               </div>
 
               {/* Rodapé com Ações */}
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 rounded-b-3xl">
+              <div className="p-6 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 rounded-b-3xl transition-colors">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors"
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancelar
                 </button>

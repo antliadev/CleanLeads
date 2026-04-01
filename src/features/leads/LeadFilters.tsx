@@ -67,8 +67,8 @@ export function LeadFilters() {
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Busque e pressione Enter..."
           className={cn(
-            'w-full pl-4 pr-12 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-white shadow-sm',
-            'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all',
+            'w-full pl-4 pr-12 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-slate-50 bg-white dark:bg-slate-900 shadow-sm transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500',
             isPending && 'opacity-60'
           )}
         />
@@ -76,8 +76,8 @@ export function LeadFilters() {
           onClick={handleSearch}
           disabled={isPending}
           className={cn(
-             "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg transition-all",
-             "hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 disabled:opacity-50",
+             "absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
+             "hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50",
              isPending && "animate-pulse"
           )}
           title="Clique para pesquisar"
@@ -95,8 +95,8 @@ export function LeadFilters() {
         value={currentStatus}
         onChange={(e) => updateUrl({ status: e.target.value })}
         className={cn(
-          'border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 bg-white shadow-sm',
-          'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all cursor-pointer',
+          'border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 shadow-sm transition-colors',
+          'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 cursor-pointer',
           isPending && 'opacity-60'
         )}
       >
@@ -110,7 +110,7 @@ export function LeadFilters() {
       {hasFilters && (
         <button
           onClick={clearAll}
-          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-500 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-200"
+          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50"
         >
           <X className="w-4 h-4" />
           Limpar

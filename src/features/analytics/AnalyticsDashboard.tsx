@@ -56,12 +56,12 @@ export function AnalyticsDashboard({ data }: Props) {
           { label: 'Convertidos', value: converted, icon: CheckCircle2, color: 'emerald' },
           { label: 'Taxa de Conversão', value: `${conversionRate}%`, icon: Target, color: 'violet' },
         ].map((card, i) => (
-          <div key={i} className="bg-white rounded-3xl border border-slate-200 p-6 hover:shadow-lg transition-all">
-            <div className={`w-10 h-10 rounded-2xl bg-${card.color}-50 flex items-center justify-center mb-4`}>
-              <card.icon className={`w-5 h-5 text-${card.color}-600`} />
+          <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 hover:shadow-lg transition-all">
+            <div className={`w-10 h-10 rounded-2xl bg-${card.color}-50 dark:bg-${card.color}-950/50 flex items-center justify-center mb-4`}>
+              <card.icon className={`w-5 h-5 text-${card.color}-600 dark:text-${card.color}-400`} />
             </div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{card.label}</p>
-            <p className="text-3xl font-black text-slate-900 mt-1">{card.value}</p>
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{card.label}</p>
+            <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{card.value}</p>
           </div>
         ))}
       </div>
@@ -69,8 +69,8 @@ export function AnalyticsDashboard({ data }: Props) {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Funil por status */}
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Funil por Status</h3>
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Funil por Status</h3>
           {statusChartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
               Nenhum dado disponível
@@ -95,8 +95,8 @@ export function AnalyticsDashboard({ data }: Props) {
         </div>
 
         {/* Distribuição por Status */}
-        <div className="bg-white rounded-3xl border border-slate-200 p-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Distribuição por Status</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Distribuição por Status</h3>
           {statusChartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
               Nenhum dado disponível
@@ -118,9 +118,9 @@ export function AnalyticsDashboard({ data }: Props) {
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
-                      <span className="text-slate-600">{item.name}</span>
+                      <span className="text-slate-600 dark:text-slate-300">{item.name}</span>
                     </div>
-                    <span className="font-bold text-slate-900">{item.value}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -131,8 +131,8 @@ export function AnalyticsDashboard({ data }: Props) {
 
       {/* Evolução temporal */}
       {leadsByDay.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-8">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Leads – Últimos 30 dias</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Leads – Últimos 30 dias</h3>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={leadsByDay}>
               <defs>

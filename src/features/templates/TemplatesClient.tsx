@@ -42,12 +42,12 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
       {/* Ações */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Filtro de canal */}
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-2xl p-1.5">
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 transition-colors">
           <button
             onClick={() => setFilterChannel('')}
             className={cn(
-              'px-4 py-2 rounded-xl text-sm font-semibold transition-all',
-              filterChannel === '' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              'px-4 py-2 rounded-xl text-sm font-semibold transition-colors',
+              filterChannel === '' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             Todos
@@ -55,8 +55,8 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
           <button
             onClick={() => setFilterChannel('LINKEDIN')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
-              filterChannel === 'LINKEDIN' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors',
+              filterChannel === 'LINKEDIN' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             <LinkedinIcon className="w-3.5 h-3.5" /> LinkedIn
@@ -64,8 +64,8 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
           <button
             onClick={() => setFilterChannel('WHATSAPP')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
-              filterChannel === 'WHATSAPP' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors',
+              filterChannel === 'WHATSAPP' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
@@ -73,8 +73,8 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
           <button
             onClick={() => setFilterChannel('EMAIL')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
-              filterChannel === 'EMAIL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors',
+              filterChannel === 'EMAIL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             <Mail className="w-3.5 h-3.5" /> E-mail
@@ -92,12 +92,12 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
 
       {/* Grid de cards */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4">
-            <Mail className="w-8 h-8 text-slate-300" />
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-20 text-center transition-colors">
+          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-4 transition-colors">
+            <Mail className="w-8 h-8 text-slate-300 dark:text-slate-600" />
           </div>
-          <h3 className="text-lg font-bold text-slate-700">Nenhum template cadastrado</h3>
-          <p className="text-sm text-slate-400 mt-1">Crie seu primeiro modelo de mensagem</p>
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">Nenhum template cadastrado</h3>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Crie seu primeiro modelo de mensagem</p>
           <button
             onClick={() => setCreating(true)}
             className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all"
@@ -114,7 +114,7 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
               <div
                 key={template.id}
                 className={cn(
-                  'bg-white rounded-3xl border border-slate-200 p-6 flex flex-col gap-4 hover:shadow-lg transition-all group',
+                  'bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4 hover:shadow-lg transition-colors group',
                   !template.isActive && 'opacity-60'
                 )}
               >
@@ -124,9 +124,9 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${channelConfig.color}`}>
                       {channelConfig.label}
                     </span>
-                    <h3 className="font-bold text-slate-900 mt-2 leading-tight">{template.name}</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100 mt-2 leading-tight">{template.name}</h3>
                     {template.subject && (
-                      <p className="text-xs text-slate-500 mt-0.5">Assunto: {template.subject}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Assunto: {template.subject}</p>
                     )}
                   </div>
                   <div className={cn('mt-0.5', template.isActive ? 'text-emerald-500' : 'text-slate-300')}>
@@ -138,31 +138,31 @@ export function TemplatesClient({ templates }: TemplatesClientProps) {
                 </div>
 
                 {/* Preview da mensagem */}
-                <p className="text-sm text-slate-600 leading-relaxed line-clamp-3 flex-1">
-                  {template.body}
-                </p>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-xs text-slate-400">{formatDate(template.createdAt)}</span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => setEditing(template)}
-                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <ConfirmDialog
-                      title="Excluir template"
-                      description={`Excluir "${template.name}"?`}
-                      onConfirm={() => handleDelete(template.id)}
-                    >
-                      <button className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                        <Trash2 className="w-4 h-4" />
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 flex-1">
+                    {template.body}
+                  </p>
+  
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 transition-colors">
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{formatDate(template.createdAt)}</span>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setEditing(template)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
                       </button>
-                    </ConfirmDialog>
+                      <ConfirmDialog
+                        title="Excluir template"
+                        description={`Excluir "${template.name}"?`}
+                        onConfirm={() => handleDelete(template.id)}
+                      >
+                        <button className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </ConfirmDialog>
+                    </div>
                   </div>
-                </div>
               </div>
             );
           })}

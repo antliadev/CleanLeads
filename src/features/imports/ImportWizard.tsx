@@ -236,24 +236,24 @@ export function ImportWizard() {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 p-8">
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
       {/* HEADER STEPS */}
-      <div className="flex items-center gap-4 mb-8 pb-8 border-b border-slate-100">
-        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>1</div>
-        <div className={`flex-1 h-1 rounded-full ${step >= 2 ? 'bg-indigo-600' : 'bg-slate-100'}`} />
-        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2</div>
-        <div className={`flex-1 h-1 rounded-full ${step >= 3 ? 'bg-indigo-600' : 'bg-slate-100'}`} />
-        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${step >= 3 ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>3</div>
+      <div className="flex items-center gap-4 mb-8 pb-8 border-b border-slate-100 dark:border-slate-800 transition-colors">
+        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition-colors ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>1</div>
+        <div className={`flex-1 h-1 rounded-full transition-colors ${step >= 2 ? 'bg-indigo-600' : 'bg-slate-100 dark:bg-slate-800'}`} />
+        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition-colors ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>2</div>
+        <div className={`flex-1 h-1 rounded-full transition-colors ${step >= 3 ? 'bg-indigo-600' : 'bg-slate-100 dark:bg-slate-800'}`} />
+        <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold transition-colors ${step >= 3 ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>3</div>
       </div>
 
       {step === 1 && (
         <div className="text-center py-12">
-          <FileSpreadsheet className="w-16 h-16 text-indigo-200 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Importar Planilha</h2>
-          <p className="text-slate-500 mb-8 max-w-md mx-auto">
+          <FileSpreadsheet className="w-16 h-16 text-indigo-200 dark:text-indigo-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Importar Planilha</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
             Faça upload do seu arquivo Excel ou CSV. O lead será importado se possuir pelo menos uma forma de contato (E-mail, Telefone ou LinkedIn).
           </p>
-          <label className="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-200 hover:bg-indigo-100 transition-colors rounded-2xl p-8 flex flex-col items-center max-w-lg mx-auto">
+          <label className="cursor-pointer bg-indigo-50 dark:bg-indigo-950/30 border-2 border-dashed border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors rounded-2xl p-8 flex flex-col items-center max-w-lg mx-auto">
             <Upload className="w-8 h-8 text-indigo-500 mb-2" />
             <span className="text-indigo-700 font-medium">Clique para selecionar ou arraste o arquivo</span>
             <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
@@ -264,8 +264,8 @@ export function ImportWizard() {
       {step === 2 && (
         <div className="space-y-8">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Mapear Colunas</h2>
-            <p className="text-slate-500">Relacione as colunas da sua planilha ({columns.length} colunas encontradas) com os dados do LimpaLeads.</p>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Mapear Colunas</h2>
+            <p className="text-slate-500 dark:text-slate-400">Relacione as colunas da sua planilha ({columns.length} colunas encontradas) com os dados do LimpaLeads.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -278,10 +278,10 @@ export function ImportWizard() {
                linkedinUrl: 'URL LinkedIn',
                notes: 'Observações'
             }).map(([key, label]) => (
-              <div key={key} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <label className="block text-sm font-bold text-slate-700 mb-2">{label}</label>
+              <div key={key} className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 transition-colors">
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">{label}</label>
                 <select 
-                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500"
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 dark:text-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-indigo-500 transition-colors"
                   value={mapping[key]}
                   onChange={e => {
                     setMapping({...mapping, [key]: e.target.value});
@@ -295,11 +295,11 @@ export function ImportWizard() {
             ))}
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-100">
+          <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800 transition-colors">
             <button 
               onClick={handleValidate}
               disabled={isValidating}
-              className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center gap-2"
+              className="bg-slate-900 dark:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
             >
               {isValidating ? (
                 <>
@@ -316,26 +316,26 @@ export function ImportWizard() {
           {validation && (
              <div className="mt-8">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">Resultado da Análise</h3>
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Resultado da Análise</h3>
                   <div className="flex gap-4">
-                    <span className="text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full font-bold text-sm">
+                    <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1 rounded-full font-bold text-sm">
                       {validation.validLeads.length} Registros Válidos
                     </span>
-                    <span className="text-rose-600 bg-rose-50 px-3 py-1 rounded-full font-bold text-sm">
+                    <span className="text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-3 py-1 rounded-full font-bold text-sm">
                       {validation.invalidRows.length} com Erro
                     </span>
                   </div>
                 </div>
 
                 {validation.invalidRows.length > 0 && (
-                  <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 mb-6 max-h-[300px] overflow-auto">
-                    <div className="flex items-center gap-2 text-rose-800 font-bold mb-3">
+                  <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/50 rounded-2xl p-4 mb-6 max-h-[300px] overflow-auto transition-colors">
+                    <div className="flex items-center gap-2 text-rose-800 dark:text-rose-400 font-bold mb-3">
                       <AlertCircle className="w-5 h-5" /> Estas linhas serão ignoradas:
                     </div>
                     {validation.invalidRows.slice(0, 50).map((err, i) => (
-                      <div key={i} className="text-sm text-rose-700 mb-2 border-b border-rose-100 pb-2">
+                      <div key={i} className="text-sm text-rose-700 dark:text-rose-300 mb-2 border-b border-rose-100 dark:border-rose-900/30 pb-2">
                         <span className="font-bold">Linha {err.row}:</span> {err.errors.join(' • ')} <br/>
-                        <span className="text-rose-400 text-xs">{(err.data[mapping.email] || err.data[mapping.fullName] || 'Sem identificação visível')}</span>
+                        <span className="text-rose-400 dark:text-rose-500 text-xs">{(err.data[mapping.email] || err.data[mapping.fullName] || 'Sem identificação visível')}</span>
                       </div>
                     ))}
                     {validation.invalidRows.length > 50 && (
@@ -361,11 +361,11 @@ export function ImportWizard() {
 
       {step === 3 && (
         <div className="text-center py-12">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-950/50 rounded-full flex items-center justify-center mx-auto mb-6 transition-colors">
+            <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h2 className="text-3xl font-bold text-slate-800 mb-2">Importação Concluída!</h2>
-          <p className="text-slate-500 mb-8 max-w-md mx-auto">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-2">Importação Concluída!</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto">
             {validation?.validLeads.length} leads foram importados e mesclados com sucesso no seu banco de dados.
           </p>
           <button 
