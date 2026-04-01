@@ -98,16 +98,11 @@ export async function verifySignupCode(_prevState: AuthResult | null, formData: 
   }
 
   const supabase = await createServerSupabase();
-  
-  let error = null;
-  if (code !== '999999') {
-    const response = await supabase.auth.verifyOtp({
-      email,
-      token: code,
-      type: 'signup' // Verifica o token de signup
-    });
-    error = response.error;
-  }
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'signup' // Verifica o token de signup
+  });
 
   if (error) {
     return { success: false, error: 'Código incorreto ou expirado. Tente novamente.', step: 'code_needed', email };
