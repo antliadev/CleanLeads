@@ -11,10 +11,7 @@ import { LEAD_STATUS_MAP } from '@/lib/constants';
 import { updateLeadStatus, registerContactAttempt } from '@/actions/leads';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperator } from '@/components/providers/OperatorProvider';
-
-type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { histories: true };
-}>;
+import type { LeadWithHistory } from './types';
 
 interface ContactActionModalProps {
   isOpen: boolean;

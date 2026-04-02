@@ -6,10 +6,7 @@ import { createLead, updateLead, type LeadFormResult } from '@/actions/leads';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import type { Prisma } from '@prisma/client';
 import { useOperator } from '@/components/providers/OperatorProvider';
-
-type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { histories: true };
-}>;
+import type { LeadWithHistory } from './types';
 
 interface LeadFormProps {
   lead?: LeadWithHistory;

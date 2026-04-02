@@ -4,14 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
 import type { Template } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
-
-type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { 
-    histories: { orderBy: { createdAt: 'desc' }, take: 10 };
-    lastOperator: { select: { name: true } };
-    leadNotes: { orderBy: { createdAt: 'desc' }, take: 1 };
-  };
-}>;
+import type { LeadWithHistory } from './types';
 
 interface LeadsTableWrapperProps {
   leads: LeadWithHistory[];

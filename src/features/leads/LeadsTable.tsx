@@ -13,18 +13,7 @@ import { LeadNotesHistoryModal } from './LeadNotesHistoryModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
 import type { Template, TemplateChannel } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
-
-type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { 
-    histories: { orderBy: { createdAt: 'desc' }, take: 10 };
-    lastOperator: { select: { name: true } };
-    leadNotes: { 
-      include: { operator: { select: { name: true } } };
-      orderBy: { createdAt: 'desc' }; 
-      take: 10;
-    };
-  };
-}>;
+import type { LeadWithHistory } from './types';
 
 interface LeadsTableProps {
   leads: LeadWithHistory[];
