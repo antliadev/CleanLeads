@@ -1,21 +1,29 @@
-'use client';
-
 import { useState } from 'react';
-import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight, MessageSquare, RefreshCw } from 'lucide-react';
 
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { LeadForm } from './LeadForm';
 import { deleteLead, deleteAllLeads } from '@/actions/leads';
-import { formatDate, getLinkedinProfileUrl, getGmailComposeUrl } from '@/lib/utils';
+import { formatDate, formatDateTime, getLinkedinProfileUrl, getGmailComposeUrl, cn } from '@/lib/utils';
 import { ContactActionModal } from './ContactActionModal';
+import { LeadNotesHistoryModal } from './LeadNotesHistoryModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
 import type { Template, TemplateChannel } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { histories: true };
+  include: { 
+    histories: { orderBy: { createdAt: 'desc' }, take: 10 };
+    lastOperator: { select: { name: true } };
+    leadNotes: { 
+      include: { operator: { select: { name: true } } };
+      orderBy: { createdAt: 'desc' }; 
+      take: 10;
+    };
+  };
 }>;
 
 interface LeadsTableProps {
@@ -28,15 +36,27 @@ interface LeadsTableProps {
 }
 
 export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange }: LeadsTableProps) {
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadWithHistory | null>(null);
   const [creating, setCreating] = useState(false);
   const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null; channel: TemplateChannel }>({ 
     isOpen: false, lead: null, channel: 'LINKEDIN' 
   });
+  const [notesModal, setNotesModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null }>({
+    isOpen: false, lead: null
+  });
 
   async function handleDelete(id: string) {
     await deleteLead(id);
   }
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    // Simula um delay para o feedback visual da animação
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   return (
     <div className="space-y-4">
@@ -46,6 +66,15 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
           {total} {total === 1 ? 'lead encontrado' : 'leads encontrados'}
         </p>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm font-bold px-4 py-2.5 rounded-xl transition-all disabled:opacity-50"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+            Atualizar
+          </button>
           {leads.length > 0 && (
             <ConfirmDialog
               title="Limpar Base de Leads"
@@ -88,8 +117,8 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
           </button>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
-          <div className="overflow-x-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors shadow-sm">
+          <div className="overflow-x-auto overflow-y-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 transition-colors">
@@ -97,7 +126,9 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Contato</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Status</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Origem</th>
-                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Criado em</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Último Operador</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Notas</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Última atividade</th>
                   <th className="px-6 py-4" />
                 </tr>
               </thead>
@@ -162,19 +193,60 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
 
                       {/* Origem */}
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${sourceConfig.color}`}>
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${sourceConfig.color} mr-2`}>
                           {sourceConfig.label}
                         </span>
+                        {lead.customSource && lead.customSource !== sourceConfig.label && (
+                          <span className="text-xs text-slate-500 italic block mt-1">
+                            {lead.customSource}
+                          </span>
+                        )}
                       </td>
 
-                      {/* Data */}
-                      <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
-                        {formatDate(lead.createdAt)}
+                      {/* Último Operador */}
+                      <td className="px-6 py-4">
+                        {lead.lastOperator ? (
+                          <div title={lead.lastOperator.name} className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md inline-flex max-w-[140px]">
+                            <div className="w-1.5 h-1.5 flex-shrink-0 rounded-full bg-indigo-500" />
+                            <span className="truncate font-medium">{lead.lastOperator.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
+                        )}
+                      </td>
+
+                      {/* Notas Preview */}
+                      <td className="px-6 py-4">
+                        {lead.leadNotes && lead.leadNotes.length > 0 ? (
+                          <button 
+                            onClick={() => setNotesModal({ isOpen: true, lead })}
+                            className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 px-2 py-1.5 rounded-lg transition-all group/note"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 opacity-40 group-hover/note:opacity-100" />
+                            <span className="truncate max-w-[120px]" title={lead.leadNotes[0].content}>
+                              {lead.leadNotes[0].content.replace('[SISTEMA]', '').trim()}
+                            </span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setNotesModal({ isOpen: true, lead })}
+                            className="text-xs text-slate-400 dark:text-slate-500 hover:text-indigo-500 px-2 py-1 rounded-lg transition-colors"
+                          >
+                            -
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Data (Última Atividade) */}
+                      <td className="px-6 py-4 text-slate-500 whitespace-nowrap text-xs font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-700 dark:text-slate-300">{formatDateTime(lead.updatedAt)}</span>
+                        </div>
                       </td>
 
                       {/* Ações */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setEditingLead(lead)}
                             className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
@@ -205,9 +277,9 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
 
           {/* Paginação */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 transition-colors">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Página {page} de {totalPages}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 transition-colors bg-slate-50/30 dark:bg-slate-950/30">
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                Página <span className="text-slate-900 dark:text-slate-100">{page}</span> de <span className="text-slate-900 dark:text-slate-100">{totalPages}</span>
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -240,6 +312,13 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
         lead={contactModal.lead}
         channel={contactModal.channel}
         templates={templates}
+      />
+
+      <LeadNotesHistoryModal
+        isOpen={notesModal.isOpen}
+        onClose={() => setNotesModal({ isOpen: false, lead: null })}
+        leadId={notesModal.lead?.id || ''}
+        leadName={notesModal.lead?.fullName || ''}
       />
     </div>
   );

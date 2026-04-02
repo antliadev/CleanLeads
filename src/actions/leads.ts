@@ -20,6 +20,7 @@ const leadSchema = z.object({
   whatsappUrl: z.string().url('URL WhatsApp inválida').optional().or(z.literal('')),
   status: z.enum(['NOVO', 'AGUARDANDO_CONEXAO', 'AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'CONVERTIDO', 'PERDIDO']).default('NOVO'),
   notes: z.string().optional(),
+  operatorId: z.string().min(1, 'Operador obrigatório'),
 });
 
 export type LeadFormResult = { success: boolean; error?: string };
@@ -27,25 +28,7 @@ export type LeadFormResult = { success: boolean; error?: string };
 // ═══════════════════════
 // Helper: obter profile do usuário autenticado
 // ═══════════════════════
-async function getAuthProfile() {
-  const supabase = await createServerSupabase();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Não autenticado');
-
-  // Recupera ou cria o perfil automaticamente
-  const profile = await prisma.profile.upsert({
-    where: { authUid: user.id },
-    update: {},
-    create: {
-      authUid: user.id,
-      email: user.email!, // Supabase garante email se configurado
-      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
-    },
-  });
-
-  return profile;
-}
-
+import { getAuthProfile } from './auth';
 // ═══════════════════════
 // Listar leads com filtros
 // ═══════════════════════
@@ -77,8 +60,16 @@ export async function getLeads({
   const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where,
-      include: { histories: { orderBy: { createdAt: 'desc' }, take: 10 } },
-      orderBy: { createdAt: 'desc' },
+      include: { 
+        histories: { orderBy: { createdAt: 'desc' }, take: 10 },
+        lastOperator: { select: { name: true } },
+        leadNotes: { 
+          include: { operator: { select: { name: true } } },
+          orderBy: { createdAt: 'desc' }, 
+          take: 10 
+        }
+      },
+      orderBy: { updatedAt: 'desc' },
       take,
       skip,
     }),
@@ -86,6 +77,30 @@ export async function getLeads({
   ]);
 
   return { leads, total, page, totalPages: Math.ceil(total / take) };
+}
+
+/**
+ * Busca o histórico completo de notas de um lead específico.
+ */
+export async function getLeadNotes(leadId: string) {
+  const profile = await getAuthProfile();
+  
+  try {
+    const notes = await prisma.leadNote.findMany({
+      where: { 
+        leadId,
+        lead: { profileId: profile.id } // Segurança: garante que o lead pertence ao perfil
+      },
+      include: { 
+        operator: { select: { name: true } } 
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return { success: true, notes };
+  } catch (error: any) {
+    console.error('Erro ao buscar notas do lead:', error);
+    return { success: false, error: 'Erro ao carregar histórico de notas' };
+  }
 }
 
 // ═══════════════════════
@@ -114,13 +129,32 @@ export async function createLead(
     const parsed = leadSchema.safeParse(raw);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
-    // Limpar campos vazios opcionais
+    // Limpar campos vazios opcionais e separar operatorId e notes
+    const { operatorId, notes, ...otherData } = parsed.data;
+    
     const data: any = Object.fromEntries(
-      Object.entries(parsed.data).filter(([, v]) => v !== '' && v !== undefined)
+      Object.entries(otherData).filter(([, v]) => v !== '' && v !== undefined)
     );
 
-    await prisma.lead.create({
-      data: { ...data, profileId: profile.id, source: 'MANUAL' as LeadSource },
+    // Usa transação para criar lead e notas de criação 
+    await prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: { 
+          ...data, 
+          profileId: profile.id, 
+          source: 'MANUAL',
+          customSource: 'Criação Manual',
+          lastOperatorId: operatorId 
+        },
+      });
+
+      await tx.leadNote.create({
+        data: {
+          leadId: lead.id,
+          operatorId,
+          content: '[SISTEMA] Lead criado manualmente. ' + (notes ? `\nNota inicial: ${notes}` : '')
+        }
+      });
     });
 
     revalidatePath('/leads');
@@ -144,13 +178,42 @@ export async function updateLead(
     const parsed = leadSchema.safeParse(raw);
     if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
+    const { operatorId, notes, ...otherData } = parsed.data;
+
     const data: any = Object.fromEntries(
-      Object.entries(parsed.data).filter(([, v]) => v !== '' && v !== undefined)
+      Object.entries(otherData).filter(([, v]) => v !== '' && v !== undefined)
     );
 
-    await prisma.lead.updateMany({
-      where: { id, profileId: profile.id },
-      data,
+    await prisma.$transaction(async (tx) => {
+      // Verifica pertencimento para não errar no update
+      const existing = await tx.lead.findFirst({ where: { id, profileId: profile.id } });
+      if (!existing) throw new Error('Lead não encontrado');
+
+      await tx.lead.update({
+        where: { id },
+        data: {
+          ...data,
+          lastOperatorId: operatorId
+        },
+      });
+
+      await tx.leadNote.create({
+        data: {
+          leadId: id,
+          operatorId,
+          content: '[SISTEMA] Cadastro do lead alterado/atualizado manualmente.'
+        }
+      });
+      
+      if (notes && notes.trim()) {
+        await tx.leadNote.create({
+          data: {
+            leadId: id,
+            operatorId,
+            content: notes.trim()
+          }
+        });
+      }
     });
 
     revalidatePath('/leads');
@@ -167,28 +230,37 @@ export async function updateLead(
 export async function updateLeadStatus(
   id: string, 
   status: LeadStatus, 
+  operatorId: string,
   notes?: string
 ): Promise<LeadFormResult> {
   try {
     const profile = await getAuthProfile();
+    if (!operatorId) throw new Error('Erro Operacional: Ação abortada por falta de identificação de operador.');
 
-    // Se houver nota, buscamos a anterior para concatenar
-    let updateData: any = { status };
-    
-    if (notes && notes.trim()) {
-      const currentLead = await prisma.lead.findUnique({
-        where: { id, profileId: profile.id },
-        select: { notes: true }
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.lead.findFirst({ where: { id, profileId: profile.id } });
+      if (!existing) throw new Error('Lead não encontrado');
+
+      await tx.lead.update({
+        where: { id },
+        data: { 
+          status,
+          lastOperatorId: operatorId
+        },
       });
 
-      const timestamp = new Date().toLocaleString('pt-BR');
-      const newNoteEntry = `\n[${timestamp}]: ${notes.trim()}`;
-      updateData.notes = (currentLead?.notes || '') + newNoteEntry;
-    }
+      let content = `[SISTEMA] Status alterado para ${status}.`;
+      if (notes && notes.trim()) {
+        content += `\nNota: ${notes.trim()}`;
+      }
 
-    await prisma.lead.updateMany({
-      where: { id, profileId: profile.id },
-      data: updateData,
+      await tx.leadNote.create({
+        data: {
+          leadId: id,
+          operatorId,
+          content
+        }
+      });
     });
 
     revalidatePath('/leads');
@@ -198,6 +270,44 @@ export async function updateLeadStatus(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao atualizar status' };
+  }
+}
+
+// ═══════════════════════
+// Registrar tentativa de contato
+// ═══════════════════════
+export async function registerContactAttempt(
+  id: string, 
+  operatorId: string, 
+  channel: string
+): Promise<LeadFormResult> {
+  try {
+    const profile = await getAuthProfile();
+    if (!operatorId) throw new Error('Erro Operacional: Ação abortada por falta de identificação de operador.');
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.lead.findFirst({ where: { id, profileId: profile.id } });
+      if (!existing) throw new Error('Lead não encontrado');
+
+      // Atualiza o lastOperatorId (mesmo que o status seja igual, a pessoa atuou)
+      await tx.lead.update({
+        where: { id },
+        data: { lastOperatorId: operatorId },
+      });
+
+      await tx.leadNote.create({
+        data: {
+          leadId: id,
+          operatorId,
+          content: `[SISTEMA] Disparo de link rápido via ${channel}.`
+        }
+      });
+    });
+
+    revalidatePath(`/leads/${id}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Erro ao registrar tentativa' };
   }
 }
 
@@ -227,6 +337,48 @@ export async function deleteAllLeads(): Promise<LeadFormResult> {
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erro ao limpar base' };
+  }
+}
+
+/**
+ * Adiciona uma nota avulsa a um lead.
+ */
+export async function addLeadNote(
+  leadId: string,
+  operatorId: string,
+  content: string
+) {
+  const profile = await getAuthProfile();
+  if (!operatorId) throw new Error('Operador obrigatório');
+
+  try {
+    const note = await prisma.leadNote.create({
+      data: {
+        leadId,
+        operatorId,
+        content: content.trim(),
+      },
+      include: {
+        operator: { select: { name: true } }
+      }
+    });
+
+    // Atualiza o lead para refletir a última atividade
+    // O Prisma já atualiza updatedAt automaticamente quando usamos .update
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { 
+        lastOperatorId: operatorId 
+      }
+    });
+
+    revalidatePath('/leads');
+    revalidatePath(`/leads/${leadId}`);
+    
+    return { success: true, note };
+  } catch (error: any) {
+    console.error('Erro ao adicionar nota ao lead:', error);
+    return { success: false, error: 'Erro ao adicionar nota' };
   }
 }
 

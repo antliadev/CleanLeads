@@ -8,11 +8,14 @@ import { validateImportData, LeadImportRow, ImportValidationResult } from '@/lib
 import { extractSmartEmail, extractSmartText } from '@/lib/utils';
 import { processImportChunk, checkLeadsDuplicity } from '@/actions/import';
 import { useRouter } from 'next/navigation';
+import { useOperator } from '@/components/providers/OperatorProvider';
 
 export function ImportWizard() {
   const router = useRouter();
+  const { activeOperator } = useOperator();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
+  const [customSource, setCustomSource] = useState('');
   
   // Dados brutos lidos
   const [rawData, setRawData] = useState<any[]>([]);
@@ -227,7 +230,7 @@ export function ImportWizard() {
 
     for (let i = 0; i < totalChunks; i++) {
         const chunk = leads.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        await processImportChunk(chunk, batchId);
+        await processImportChunk(chunk, batchId, activeOperator?.id || '', customSource || undefined);
         setProgress(Math.round(((i + 1) / totalChunks) * 100));
     }
 
@@ -343,6 +346,21 @@ export function ImportWizard() {
                     )}
                   </div>
                 )}
+
+                <div className="mb-6 p-5 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Origem desta lista (Opcional)
+                  </label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    Nomeie a origem para facilitar o filtro e rastreamento. Ex: &quot;Cold Email Q3&quot;, &quot;Scraping Evento XP&quot;.
+                  </p>
+                  <input
+                    value={customSource}
+                    onChange={(e) => setCustomSource(e.target.value)}
+                    placeholder="Ex: Campanha Cold Email"
+                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-colors"
+                  />
+                </div>
 
                 <div className="flex justify-end">
                   <button 

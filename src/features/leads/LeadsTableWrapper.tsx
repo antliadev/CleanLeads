@@ -6,7 +6,11 @@ import type { Template } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 type LeadWithHistory = Prisma.LeadGetPayload<{
-  include: { histories: true };
+  include: { 
+    histories: { orderBy: { createdAt: 'desc' }, take: 10 };
+    lastOperator: { select: { name: true } };
+    leadNotes: { orderBy: { createdAt: 'desc' }, take: 1 };
+  };
 }>;
 
 interface LeadsTableWrapperProps {

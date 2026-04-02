@@ -19,6 +19,7 @@ model Profile {
 
   leads     Lead[]
   templates Template[]
+  operators Operator[]
 
   @@map("profiles")
 }
@@ -39,15 +40,20 @@ model Lead {
   whatsappUrl   String?    @map("whatsapp_url")
   status        LeadStatus @default(NOVO)
   source        LeadSource @default(MANUAL)
-  notes         String?
-  importBatchId String?    @map("import_batch_id")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @updatedAt @map("updated_at")
+  notes          String?
+  importBatchId  String?    @map("import_batch_id")
+  customSource   String?    @map("custom_source")
+  lastOperatorId String?    @map("last_operator_id")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  histories LeadHistory[]
+  profile      Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  lastOperator Operator?     @relation(fields: [lastOperatorId], references: [id], onDelete: SetNull)
+  histories    LeadHistory[]
+  leadNotes    LeadNote[]
 
   @@index([profileId])
+  @@index([lastOperatorId])
   @@index([status])
   @@index([source])
   @@index([createdAt])
@@ -115,4 +121,42 @@ enum TemplateChannel {
   EMAIL
   LINKEDIN
   WHATSAPP
+}
+
+// ─────────────────────────────────────────────
+// OPERADORES
+// ─────────────────────────────────────────────
+model Operator {
+  id        String   @id @default(uuid())
+  profileId String   @map("profile_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+  leadNotes LeadNote[]
+
+  @@index([profileId])
+  @@map("operators")
+}
+
+// ─────────────────────────────────────────────
+// NOTAS DOS LEADS
+// ─────────────────────────────────────────────
+model LeadNote {
+  id         String   @id @default(uuid())
+  leadId     String   @map("lead_id")
+  operatorId String?  @map("operator_id") // Nullable for migration
+  content    String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  lead     Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  operator Operator? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([leadId])
+  @@index([operatorId])
+  @@map("lead_notes")
 }

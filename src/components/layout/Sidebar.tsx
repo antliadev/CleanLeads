@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, BadgeCheck, Upload } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, BadgeCheck, Upload, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
@@ -10,6 +10,7 @@ const menuItems = [
   { icon: Users, label: 'Leads', href: '/leads' },
   { icon: FileText, label: 'Templates', href: '/templates' },
   { icon: Upload, label: 'Importar', href: '/import' },
+  { icon: Settings, label: 'Configurações', href: '/settings' },
 ];
 
 export function Sidebar() {

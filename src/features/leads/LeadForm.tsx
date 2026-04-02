@@ -5,6 +5,7 @@ import { Loader2, X } from 'lucide-react';
 import { createLead, updateLead, type LeadFormResult } from '@/actions/leads';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import type { Prisma } from '@prisma/client';
+import { useOperator } from '@/components/providers/OperatorProvider';
 
 type LeadWithHistory = Prisma.LeadGetPayload<{
   include: { histories: true };
@@ -16,6 +17,7 @@ interface LeadFormProps {
 }
 
 export function LeadForm({ lead, onClose }: LeadFormProps) {
+  const { activeOperator } = useOperator();
   const isEdit = !!lead;
 
   const action = isEdit
@@ -52,6 +54,7 @@ export function LeadForm({ lead, onClose }: LeadFormProps) {
 
         {/* Form */}
         <form action={formAction} className="px-8 py-6 space-y-5 max-h-[70vh] overflow-y-auto">
+          <input type="hidden" name="operatorId" value={activeOperator?.id || ''} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Nome */}
             <div className="md:col-span-2">

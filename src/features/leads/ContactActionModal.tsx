@@ -8,8 +8,9 @@ import { parseTemplate } from '@/lib/template-parser';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { getGmailComposeUrl, getWhatsAppUrl, cn } from '@/lib/utils';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
-import { updateLeadStatus } from '@/actions/leads';
+import { updateLeadStatus, registerContactAttempt } from '@/actions/leads';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useOperator } from '@/components/providers/OperatorProvider';
 
 type LeadWithHistory = Prisma.LeadGetPayload<{
   include: { histories: true };
@@ -34,6 +35,7 @@ export function ContactActionModal({
   const [compiledSubject, setCompiledSubject] = useState('');
   const [compiledText, setCompiledText] = useState('');
   const [copied, setCopied] = useState(false);
+  const { activeOperator } = useOperator();
   type ModalView = 'PREPARATION' | 'WAITING' | 'FOLLOWUP' | 'FOLLOWUP_QUESTION' | 'FOLLOWUP_NOTE';
   const [view, setView] = useState<ModalView>('PREPARATION');
   const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
@@ -134,6 +136,10 @@ export function ContactActionModal({
       }
     }
 
+    if (activeOperator) {
+      await registerContactAttempt(lead.id, activeOperator.id, channelLabel);
+    }
+
     // Ativa o modo de espera pelo retorno do usuário
     setView('WAITING');
   };
@@ -147,7 +153,7 @@ export function ContactActionModal({
     if (!pendingStatus) return;
     setIsUpdatingStatus(true);
     try {
-      await updateLeadStatus(lead.id, pendingStatus);
+      await updateLeadStatus(lead.id, pendingStatus, activeOperator?.id || '');
       onClose();
     } catch (err) {
       console.error('Erro ao atualizar status:', err);
@@ -160,7 +166,7 @@ export function ContactActionModal({
     if (!pendingStatus) return;
     setIsUpdatingStatus(true);
     try {
-      await updateLeadStatus(lead.id, pendingStatus, note);
+      await updateLeadStatus(lead.id, pendingStatus, activeOperator?.id || '', note);
       onClose();
     } catch (err) {
       console.error('Erro ao atualizar status com nota:', err);
@@ -255,21 +261,26 @@ export function ContactActionModal({
 
               <div className="grid grid-cols-2 gap-4">
                 {Object.entries(LEAD_STATUS_MAP)
-                  .filter(([key]) => ['AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'PERDIDO', 'VITORIA'].includes(key))
+                  .filter(([key]) => ['AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'PERDIDO', 'CONVERTIDO'].includes(key))
                   .map(([key, config]) => {
                     const Icon = config.icon;
+                    // Extrai todas as classes de borda (incluindo dark:)
+                    const borderClasses = config.color.split(' ').filter(c => c.includes('border-')).join(' ');
+                    // Extrai todas as classes de background (incluindo dark:)
+                    const bgClasses = config.color.split(' ').filter(c => c.includes('bg-')).join(' ');
+
                     return (
                       <button
                         key={key}
                         disabled={isUpdatingStatus}
                         onClick={() => handleStatusSelect(key as LeadStatus)}
                         className={cn(
-                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group",
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group text-center",
                           "hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 active:scale-95 disabled:opacity-50",
-                          config.color.includes('border-') ? config.color.split(' ').find(c => c.startsWith('border-')) : 'border-slate-100 dark:border-slate-800'
+                          borderClasses || 'border-slate-100 dark:border-slate-800'
                         )}
                       >
-                        <div className={cn("p-4 rounded-2xl mb-3 transition-colors", config.color.split(' ')[0])}>
+                        <div className={cn("p-4 rounded-2xl mb-3 transition-colors", bgClasses)}>
                           <Icon className="w-8 h-8" />
                         </div>
                         <span className="font-bold text-slate-700 dark:text-slate-300 group-hover:dark:text-indigo-300">{config.label}</span>

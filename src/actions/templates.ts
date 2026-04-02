@@ -20,24 +20,7 @@ const templateSchema = z.object({
 export type TemplateFormResult = { success: boolean; error?: string };
 
 // Helper
-async function getAuthProfile() {
-  const supabase = await createServerSupabase();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Não autenticado');
-
-  // Recupera ou cria o perfil automaticamente
-  const profile = await prisma.profile.upsert({
-    where: { authUid: user.id },
-    update: {},
-    create: {
-      authUid: user.id,
-      email: user.email!,
-      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
-    },
-  });
-
-  return profile;
-}
+import { getAuthProfile } from './auth';
 
 // ═══════════════════════
 // Listar templates

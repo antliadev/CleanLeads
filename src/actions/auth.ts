@@ -120,3 +120,27 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect('/login');
 }
+
+// ═══════════════════════════════════════════
+// Helper: getAuthProfile
+// ═══════════════════════════════════════════
+import { prisma } from '@/lib/prisma';
+
+export async function getAuthProfile() {
+  const supabase = await createServerSupabase();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error('Não autenticado');
+
+  // Recupera ou cria o perfil automaticamente
+  const profile = await prisma.profile.upsert({
+    where: { authUid: user.id },
+    update: {},
+    create: {
+      authUid: user.id,
+      email: user.email!, // Supabase garante email se configurado
+      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+    },
+  });
+
+  return profile;
+}
