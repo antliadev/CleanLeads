@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FileText, BadgeCheck, Upload, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, BadgeCheck, Upload, Settings, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/analytics' },
+  { icon: CalendarDays, label: 'Agenda', href: '/agenda' },
   { icon: Users, label: 'Leads', href: '/leads' },
   { icon: FileText, label: 'Templates', href: '/templates' },
   { icon: Upload, label: 'Importar', href: '/import' },

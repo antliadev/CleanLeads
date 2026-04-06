@@ -1,12 +1,17 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { BadgeCheck, Loader2 } from 'lucide-react';
 import { login, type AuthResult } from '@/actions/auth';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState<AuthResult | null, FormData>(login, null);
+
+
 
   return (
     <div className="space-y-8">
@@ -35,21 +40,27 @@ export default function LoginPage() {
             required
             className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
             placeholder="seu@email.com"
+            defaultValue={state?.email || ''}
           />
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-semibold text-slate-300 mb-2">
-            Senha
-          </label>
-          <input
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="block text-sm font-semibold text-slate-300">
+              Senha
+            </label>
+            <Link 
+              href="/esqueci-senha" 
+              className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Esqueceu a senha?
+            </Link>
+          </div>
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
-            minLength={6}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
             placeholder="••••••••"
           />
         </div>

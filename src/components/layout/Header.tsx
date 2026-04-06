@@ -4,6 +4,7 @@ import { LogOut, User } from 'lucide-react';
 import { logout } from '@/actions/auth';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useOperator } from '@/components/providers/OperatorProvider';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
 
 interface HeaderProps {
   userName: string;
@@ -31,6 +32,9 @@ export function Header({ userName }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-4">
+        {/* Sino de Notificações */}
+        <NotificationBell />
+
         {/* Toggle de Tema */}
         <ThemeToggle />
         

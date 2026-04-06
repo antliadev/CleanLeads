@@ -29,7 +29,7 @@ export async function getAnalytics() {
     totalLeads,
     byStatus,
     bySource,
-    recentLeads,
+    cadenceStats,
   ] = await Promise.all([
     // Total
     prisma.lead.count({ where: { profileId: profile.id } }),
@@ -48,31 +48,18 @@ export async function getAnalytics() {
       _count: { source: true },
     }),
 
-    // Leads dos últimos 30 dias (agrupados por dia para o gráfico)
-    prisma.lead.findMany({
-      where: {
-        profileId: profile.id,
-        createdAt: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        },
-      },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' },
+    // Estatísticas de Cadência
+    prisma.leadCadenceProgress.groupBy({
+      by: ['currentStageOrder'],
+      where: { profileId: profile.id, status: 'ACTIVE' },
+      _count: { currentStageOrder: true },
     }),
   ]);
-
-  // Agrupar leads por dia
-  const dayMap: Record<string, number> = {};
-  for (const lead of recentLeads) {
-    const day = lead.createdAt.toISOString().split('T')[0];
-    dayMap[day] = (dayMap[day] || 0) + 1;
-  }
-  const leadsByDay = Object.entries(dayMap).map(([date, count]) => ({ date, count }));
 
   return {
     totalLeads,
     byStatus: byStatus.map((s) => ({ status: s.status, count: s._count.status })),
     bySource: bySource.map((s) => ({ source: s.source, count: s._count.source })),
-    leadsByDay,
+    cadenceStats: cadenceStats.map(s => ({ stage: s.currentStageOrder, count: s._count.currentStageOrder })),
   };
 }

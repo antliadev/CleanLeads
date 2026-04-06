@@ -1,49 +1,129 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BadgeCheck, Loader2, MailCheck, ArrowLeft } from 'lucide-react';
-import { register, verifySignupCode, type AuthResult } from '@/actions/auth';
+import { useSearchParams } from 'next/navigation';
+import { BadgeCheck, Loader2, MailCheck, UserPlus, ShieldCheck } from 'lucide-react';
+import { 
+  requestSignupCode, 
+  verifySignupCode, 
+  completeSignup, 
+  type AuthResult 
+} from '@/actions/auth';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 
 export default function RegisterPage() {
-  const [registerState, registerAction, isRegisterPending] = useActionState<AuthResult | null, FormData>(register, null);
+  const searchParams = useSearchParams();
+  const initialEmail = searchParams.get('email') || '';
+  const initialStepParam = searchParams.get('step');
+  
+  // Estados para as 3 ações
+  const [requestState, requestAction, isRequestPending] = useActionState<AuthResult | null, FormData>(requestSignupCode, null);
   const [verifyState, verifyAction, isVerifyPending] = useActionState<AuthResult | null, FormData>(verifySignupCode, null);
+  const [completeState, completeAction, isCompletePending] = useActionState<AuthResult | null, FormData>(completeSignup, null);
 
-  const isCodeStep = registerState?.step === 'code_needed' || verifyState?.step === 'code_needed';
-  const currentEmail = verifyState?.email || registerState?.email || '';
-  const currentError = verifyState?.error || registerState?.error;
+  // Determinar o passo atual
+  const [currentStep, setCurrentStep] = useState<'email' | 'verify' | 'complete'>('email');
+  const [email, setEmail] = useState(initialEmail);
+
+  // Efeito para sincronizar passos via actions
+  useEffect(() => {
+    if (requestState?.success && requestState?.step === 'verify_needed') {
+      setCurrentStep('verify');
+      if (requestState.email) setEmail(requestState.email);
+    }
+    if (verifyState?.success && verifyState?.step === 'complete_needed') {
+      setCurrentStep('complete');
+      if (verifyState.email) setEmail(verifyState.email);
+    }
+    // Caso especial vindo do login: ?step=verify
+    if (initialStepParam === 'verify' && initialEmail) {
+      setCurrentStep('verify');
+      setEmail(initialEmail);
+    }
+  }, [requestState, verifyState, initialStepParam, initialEmail]);
+
+  const error = requestState?.error || verifyState?.error || completeState?.error;
 
   return (
     <div className="space-y-8">
-      {/* Logo */}
+      {/* Cabeçalho dinâmico por etapa */}
       <div className="text-center">
         <div className="inline-flex items-center gap-3 mb-6">
-          <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-500/30">
-            {isCodeStep ? (
-              <MailCheck className="w-8 h-8 text-white" />
-            ) : (
-              <BadgeCheck className="w-8 h-8 text-white" />
-            )}
+          <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg shadow-indigo-500/30 transition-transform active:scale-95">
+            {currentStep === 'email' && <BadgeCheck className="w-8 h-8 text-white" />}
+            {currentStep === 'verify' && <MailCheck className="w-8 h-8 text-white animate-pulse" />}
+            {currentStep === 'complete' && <UserPlus className="w-8 h-8 text-white" />}
           </div>
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          {isCodeStep ? 'Verifique seu E-mail' : 'Criar Conta'}
+          {currentStep === 'email' && 'Criar sua conta'}
+          {currentStep === 'verify' && 'Verifique seu e-mail'}
+          {currentStep === 'complete' && 'Dados finais'}
         </h1>
-        <p className="text-slate-400 mt-2">
-          {isCodeStep 
-            ? 'Enviamos um código de 6 dígitos para o seu e-mail' 
-            : 'Comece a gerenciar seus leads agora'}
+        <p className="text-slate-400 mt-2 max-w-xs mx-auto">
+          {currentStep === 'email' && 'Enviaremos um código de segurança configurado para seu e-mail.'}
+          {currentStep === 'verify' && `Enviamos o código para ${email}. Informe abaixo para continuar.`}
+          {currentStep === 'complete' && 'Defina seu nome e senha para acessar a plataforma.'}
         </p>
       </div>
 
-      {/* Formulário Step 2 (Código) */}
-      {isCodeStep ? (
-        <form action={verifyAction} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <input type="hidden" name="email" value={currentEmail} />
-          
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-1 relative">
+        {/* Progress Bar (Subtle) */}
+        <div className="absolute top-0 left-0 h-1 bg-indigo-500 rounded-full transition-all duration-500 z-10" 
+             style={{ width: currentStep === 'email' ? '33.3%' : currentStep === 'verify' ? '66.6%' : '100%' }} 
+        />
+      </div>
+
+      {/* ETAPA 1: SOLICITAR CÓDIGO */}
+      {currentStep === 'email' && (
+        <form action={requestAction} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div>
+            <label htmlFor="email" className="block text-sm font-semibold text-slate-300 mb-2 font-medium">
+              Seu E-mail Profissional
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all shadow-inner"
+              placeholder="seu@email.com"
+              defaultValue={email}
+            />
+          </div>
+
+          {requestState?.error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-medium">
+              {requestState.error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isRequestPending}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 group"
+          >
+            {isRequestPending ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                Continuar
+                <ShieldCheck className="w-4 h-4 text-indigo-200 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
+      )}
+
+      {/* ETAPA 2: VERIFICAR CÓDIGO */}
+      {currentStep === 'verify' && (
+        <form action={verifyAction} className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+          <input type="hidden" name="email" value={email} />
+          
+          <div className="space-y-4">
             <label htmlFor="code" className="block text-sm font-semibold text-slate-300 mb-2 text-center">
-              Digite o código de 6 dígitos
+              Código de verificação
             </label>
             <input
               id="code"
@@ -52,9 +132,9 @@ export default function RegisterPage() {
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={6}
-              autoComplete="one-time-code"
               required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white text-center text-3xl tracking-widest font-mono placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+              autoFocus
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-4 text-white text-center text-3xl tracking-[1em] font-mono placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-bold"
               placeholder="000000"
             />
           </div>
@@ -68,107 +148,79 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isVerifyPending}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isVerifyPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Validando...
-              </>
-            ) : (
-              'Ativar Conta'
-            )}
+            {isVerifyPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verificar Código'}
           </button>
 
-          <p className="text-center text-sm text-slate-500 mt-6">
-            Não recebeu? Verifique o Spam ou{' '}
-            <button 
-              type="button" 
-              onClick={() => window.location.reload()} 
-              className="text-indigo-400 hover:text-indigo-300 font-semibold"
-            >
-              voltar ao início
-            </button>
-          </p>
+          <button 
+            type="button" 
+            onClick={() => setCurrentStep('email')} 
+            className="w-full text-sm text-slate-500 hover:text-slate-300 transition-colors font-medium"
+          >
+            Alterar e-mail informado
+          </button>
         </form>
-      ) : (
-        /* Formulário Step 1 (Dados) */
-        <form action={registerAction} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      )}
+
+      {/* ETAPA 3: DADOS FINAIS */}
+      {currentStep === 'complete' && (
+        <form action={completeAction} className="space-y-5 animate-in fade-in zoom-in-95 duration-500">
+          <input type="hidden" name="email" value={email} />
+          
           <div>
             <label htmlFor="name" className="block text-sm font-semibold text-slate-300 mb-2">
-              Nome
+              Nome Completo
             </label>
             <input
               id="name"
               name="name"
               type="text"
-              autoComplete="name"
               required
-              minLength={2}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-              placeholder="Seu nome completo"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+              placeholder="Seu nome"
             />
           </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-semibold text-slate-300 mb-2">
-              E-mail
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-              placeholder="seu@email.com"
-            />
-          </div>
+          <PasswordInput
+            id="password"
+            name="password"
+            label="Defina uma senha"
+            placeholder="Mínimo 6 caracteres"
+            required
+            minLength={6}
+          />
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-semibold text-slate-300 mb-2">
-              Senha
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={6}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
-              placeholder="Mínimo 6 caracteres"
-            />
-          </div>
+          <PasswordInput
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirmar senha"
+            placeholder="Repita a senha"
+            required
+            minLength={6}
+          />
 
-          {registerState?.error && (
+          {completeState?.error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-medium">
-              {registerState.error}
+              {completeState.error}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={isRegisterPending}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            disabled={isCompletePending}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isRegisterPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Criando conta...
-              </>
-            ) : (
-              'Criar Conta'
-            )}
+            {isCompletePending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Finalizar e Entrar'}
           </button>
         </form>
       )}
 
-      {!isCodeStep && (
+      {currentStep === 'email' && (
         <p className="text-center text-sm text-slate-500">
-          Já tem conta?{' '}
+          Já possui conta?{' '}
           <Link href="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-            Faça login
+            Fazer login
           </Link>
         </p>
       )}

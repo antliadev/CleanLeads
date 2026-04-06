@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
 import { OperatorProvider } from '@/components/providers/OperatorProvider';
+import { CadenceProvider } from '@/components/providers/CadenceProvider';
 import { prisma } from '@/lib/prisma';
 
 export default async function DashboardLayout({

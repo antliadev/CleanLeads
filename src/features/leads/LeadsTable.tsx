@@ -11,6 +11,8 @@ import { formatDate, formatDateTime, getLinkedinProfileUrl, getGmailComposeUrl, 
 import { ContactActionModal } from './ContactActionModal';
 import { LeadNotesHistoryModal } from './LeadNotesHistoryModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
+import { startLeadCadenceBulk } from '@/actions/cadence';
+import { toast } from 'sonner';
 import type { Template, TemplateChannel } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import type { LeadWithHistory } from './types';
@@ -35,6 +37,8 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   const [notesModal, setNotesModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null }>({
     isOpen: false, lead: null
   });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkStarting, setIsBulkStarting] = useState(false);
 
   async function handleDelete(id: string) {
     await deleteLead(id);
@@ -55,6 +59,29 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
           {total} {total === 1 ? 'lead encontrado' : 'leads encontrados'}
         </p>
         <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={async () => {
+                setIsBulkStarting(true);
+                try {
+                  await startLeadCadenceBulk(selectedIds);
+                  toast.success(`${selectedIds.length} leads enviados para cadência.`);
+                  setSelectedIds([]);
+                  router.refresh();
+                } catch (e: any) {
+                  toast.error(e.message);
+                } finally {
+                  setIsBulkStarting(false);
+                }
+              }}
+              disabled={isBulkStarting}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+            >
+              {isBulkStarting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Iniciar Cadência ({selectedIds.length})
+            </button>
+          )}
+
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -111,10 +138,25 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 transition-colors">
+                  <th className="px-6 py-4 w-4">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                      checked={selectedIds.length === leads.length && leads.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(leads.map(l => l.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Lead</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Contato</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Status</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Origem</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Follow-up</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Último Operador</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Notas</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Última atividade</th>
@@ -128,7 +170,24 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                   const gmailUrl = getGmailComposeUrl(lead.email, lead.fullName);
 
                   return (
-                    <tr key={lead.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group">
+                    <tr key={lead.id} className={cn(
+                      "hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors group",
+                      selectedIds.includes(lead.id) && "bg-indigo-50/30 dark:bg-indigo-900/10"
+                    )}>
+                      <td className="px-6 py-4">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-slate-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                          checked={selectedIds.includes(lead.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds(prev => [...prev, lead.id]);
+                            } else {
+                              setSelectedIds(prev => prev.filter(id => id !== lead.id));
+                            }
+                          }}
+                        />
+                      </td>
                       {/* Lead info */}
                       <td className="px-6 py-4">
                         <div>
@@ -182,13 +241,50 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
 
                       {/* Origem */}
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${sourceConfig.color} mr-2`}>
-                          {sourceConfig.label}
-                        </span>
-                        {lead.customSource && lead.customSource !== sourceConfig.label && (
-                          <span className="text-xs text-slate-500 italic block mt-1">
-                            {lead.customSource}
+                        {lead.customSource ? (
+                          <div className="flex flex-col">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-600 text-[10px] font-black uppercase text-white shadow-lg shadow-indigo-500/30 tracking-wider">
+                              {lead.customSource}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={cn(
+                            "text-[10px] uppercase font-bold px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 tracking-tight",
+                          )}>
+                            {sourceConfig.label}
                           </span>
+                        )}
+                      </td>
+
+                      {/* Follow-up / Cadência */}
+                      <td className="px-6 py-4">
+                        {(lead as any).cadenceEngine ? (
+                          <div className="flex flex-col gap-1">
+                            <span className={cn(
+                              "text-[10px] inline-flex items-center px-2 py-0.5 rounded-md font-bold uppercase",
+                              (lead as any).cadenceEngine.status === 'ACTIVE' 
+                                ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
+                                : "bg-slate-50 text-slate-400 border border-slate-100"
+                            )}>
+                              {(lead as any).cadenceEngine.status === 'ACTIVE' ? 'Em Cadência' : 'Cadência Pausada'}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-medium">Estágio {(lead as any).cadenceEngine.currentStageOrder}</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const { startLeadCadence } = await import('@/actions/cadence');
+                                await startLeadCadence(lead.id);
+                                router.refresh();
+                              } catch (e: any) {
+                                alert(e.message);
+                              }
+                            }}
+                            className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 px-2 py-1 rounded-md border border-slate-100 border-dashed transition-all"
+                          >
+                            + Iniciar
+                          </button>
                         )}
                       </td>
 

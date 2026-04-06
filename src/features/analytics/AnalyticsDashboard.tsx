@@ -24,12 +24,12 @@ interface Props {
     totalLeads: number;
     byStatus: { status: string; count: number }[];
     bySource: { source: string; count: number }[];
-    leadsByDay: { date: string; count: number }[];
+    cadenceStats: { stage: number; count: number }[];
   };
 }
 
 export function AnalyticsDashboard({ data }: Props) {
-  const { totalLeads, byStatus, bySource, leadsByDay } = data;
+  const { totalLeads, byStatus, bySource } = data;
 
   const converted = byStatus.find((s) => s.status === 'CONVERTIDO')?.count ?? 0;
   const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : '0';
@@ -129,24 +129,51 @@ export function AnalyticsDashboard({ data }: Props) {
         </div>
       </div>
 
-      {/* Evolução temporal */}
-      {leadsByDay.length > 0 && (
+      {/* Funil de Cadência (Novo) */}
+      {(data as any).cadenceStats && (data as any).cadenceStats.length > 0 && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Leads – Últimos 30 dias</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={leadsByDay}>
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Funil de Distribuição da Cadência</h3>
+              <p className="text-sm text-slate-500 font-medium">Quantidade de leads ativos em cada estágio da prospecção</p>
+            </div>
+            <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-100 dark:border-emerald-800">
+               <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Pipeline Ativo</span>
+            </div>
+          </div>
+          
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart 
+              data={(data as any).cadenceStats.sort((a: any, b: any) => a.stage - b.stage)} 
+              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            >
               <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={1} />
+                  <stop offset="95%" stopColor="#818cf8" stopOpacity={0.8} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }} />
-              <Area type="monotone" dataKey="count" stroke="#6366f1" strokeWidth={2} fill="url(#areaGrad)" />
-            </AreaChart>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis 
+                dataKey="stage" 
+                label={{ value: 'Estágio', position: 'insideBottomRight', offset: -10, fontSize: 10, fill: '#94a3b8' }}
+                tick={{ fontSize: 12, fontWeight: 'bold', fill: '#64748b' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+              <Tooltip 
+                cursor={{ fill: 'rgba(99, 102, 241, 0.05)', radius: 10 }}
+                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', padding: '12px' }}
+                formatter={(v) => [`${v} leads`, 'Ativos']}
+                labelFormatter={(label) => `Estágio ${label}`}
+              />
+              <Bar dataKey="count" fill="url(#barGrad)" radius={[10, 10, 0, 0]} maxBarSize={60}>
+                 {(data as any).cadenceStats.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fillOpacity={1 - (index * 0.1)} />
+                 ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
