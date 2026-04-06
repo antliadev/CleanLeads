@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { BadgeCheck, Loader2, MailCheck, UserPlus, ShieldCheck } from 'lucide-react';
@@ -12,7 +12,7 @@ import {
 } from '@/actions/auth';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 
-export default function RegisterPage() {
+function RegisterContent() {
   const searchParams = useSearchParams();
   const initialEmail = searchParams.get('email') || '';
   const initialStepParam = searchParams.get('step');
@@ -93,9 +93,9 @@ export default function RegisterPage() {
             />
           </div>
 
-          {requestState?.error && (
+          {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-medium">
-              {requestState.error}
+              {error}
             </div>
           )}
 
@@ -139,9 +139,9 @@ export default function RegisterPage() {
             />
           </div>
 
-          {verifyState?.error && (
+          {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-medium text-center">
-              {verifyState.error}
+              {error}
             </div>
           )}
 
@@ -200,9 +200,9 @@ export default function RegisterPage() {
             minLength={6}
           />
 
-          {completeState?.error && (
+          {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-red-400 text-sm font-medium">
-              {completeState.error}
+              {error}
             </div>
           )}
 
@@ -225,5 +225,13 @@ export default function RegisterPage() {
         </p>
       )}
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-10 text-white">Carregando...</div>}>
+      <RegisterContent />
+    </Suspense>
   );
 }
