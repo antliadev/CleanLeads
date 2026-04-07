@@ -1,28 +1,24 @@
-import { PrismaClient } from '../generated/client';
+import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+    prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL não definida nas variáveis de ambiente');
-  }
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+          throw new Error('DATABASE_URL not found');
+    }
 
-  // Prisma 7 exige driver adapter explícito (não usa engines nativos)
   const adapter = new PrismaPg({ connectionString });
 
   return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+        adapter,
+        log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 }
 
-// Bypass cache temporarily to force new schema load
-export const prisma = createPrismaClient();
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
