@@ -6,7 +6,7 @@ import { LeadFilters } from '@/features/leads/LeadFilters';
 import { LeadsTableWrapper } from '@/features/leads/LeadsTableWrapper';
 
 interface LeadsPageProps {
-  searchParams: Promise<{ search?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; stage?: string; page?: string }>;
 }
 
 export const metadata = {
@@ -19,8 +19,9 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const page = Number(params.page) || 1;
   const search = params.search || '';
   const status = params.status || '';
+  const stage = params.stage || '';
 
-  const { leads, total, totalPages } = await getLeads({ page, search, status });
+  const { leads, total, totalPages } = await getLeads({ page, search, status, stage });
   // Opcional: injetamos os templates ativos para uso nos modais
   const { getTemplates } = await import('@/actions/templates');
   const temp = await getTemplates();

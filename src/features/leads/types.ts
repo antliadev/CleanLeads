@@ -9,5 +9,26 @@ export type LeadWithHistory = Prisma.LeadGetPayload<{
       orderBy: { createdAt: 'desc' }; 
       take: 10;
     };
+    cadenceEngine: {
+      select: {
+        status: true;
+        currentStageOrder: true;
+        cadence: {
+          select: {
+            stages: {
+              select: {
+                order: true;
+                channel: true;
+                template: {
+                  select: {
+                    name: true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    };
   };
 }>;
