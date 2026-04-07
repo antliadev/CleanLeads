@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { CadenceStatus, TemplateChannel } from '../generated/client';
+import { CadenceStatus, TemplateChannel } from '@prisma/client';
 import { getAuthProfile } from './auth';
 
 /**

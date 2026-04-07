@@ -50,42 +50,46 @@ const ALIASES: Record<string, keyof LeadData | 'firstName'> = {
 /**
  * Interpola as variáveis no corpo do template.
  * Se o campo estiver vazio, nulo ou indefinido, a variável é removida (substituída por string vazia).
- * Tratamento robusto para não deixar chaves literais no texto final.
+ * Tratamento robusto via Regex Global para substituir todas as ocorrências de forma atômica.
  */
 export function interpolateTemplate(body: string, lead: LeadData): string {
   if (!body) return '';
 
-  let processed = body;
+  // Extração robusta do primeiro nome (trata múltiplos espaços e nulos)
+  const firstName = lead.fullName?.trim().split(/\s+/)[0] || '';
+  
+  const values: Record<string, string> = {
+    fullName: lead.fullName || '',
+    firstName: firstName,
+    company: lead.company || '',
+    jobTitle: lead.jobTitle || '',
+    email: lead.email || '',
+    phone: lead.phone || '',
+    linkedinUrl: lead.linkedinUrl || '',
+  };
 
-  // Encontra todas as variáveis do tipo {{variavel}}
-  const regex = /{{(.*?)}}/g;
-  const matches = body.matchAll(regex);
-
-  // Extrai o primeiro nome de forma antecipada para o caso virtual
-  const firstName = lead.fullName?.trim().split(' ')[0] || '';
-
-  for (const match of matches) {
-    const fullMatch = match[0]; // {{variavel}}
-    const variableName = match[1].trim().toLowerCase(); // variavel
+  /**
+   * Explicação da Regex: {{([\s\S]*?)}}
+   * {{ : Início da tag
+   * ([\s\S]*?) : Captura qualquer caractere (incluindo quebras de linha) de forma não-gulosa (parando no primeiro }})
+   * }} : Fim da tag
+   * /g : Global (substitui todas as ocorrências)
+   */
+  return body.replace(/{{([\s\S]*?)}}/g, (match, p1) => {
+    // Normaliza o nome da variável para busca no mapa de aliases
+    const variableName = p1.trim().toLowerCase();
     
     // Verifica se temos um alias conhecido para essa variável
     const fieldKey = ALIASES[variableName];
     
     if (fieldKey) {
-      if (fieldKey === 'firstName') {
-        processed = processed.replace(fullMatch, firstName);
-      } else {
-        const value = lead[fieldKey] || '';
-        processed = processed.replace(fullMatch, value);
-      }
-    } else {
-      // Se a variável é desconhecida, o escopo diz: "O texto final nunca pode copiar a variável literal para o canal."
-      // Mantemos a regra de fallback de remover a variável.
-      processed = processed.replace(fullMatch, '');
+      // Retorna o valor limpo ou string vazia
+      return (values[fieldKey] || '').trim();
     }
-  }
-
-  return processed;
+    
+    // Se a variável é desconhecida, removemos para não contaminar a mensagem final
+    return '';
+  }).trim();
 }
 
 /**
@@ -96,26 +100,34 @@ export function getMissingFields(body: string, lead: LeadData): string[] {
   if (!body) return [];
 
   const missing: string[] = [];
-  const regex = /{{(.*?)}}/g;
+  const firstName = lead.fullName?.trim().split(/\s+/)[0] || '';
+  
+  const values: Record<string, string> = {
+    fullName: lead.fullName || '',
+    firstName: firstName,
+    company: lead.company || '',
+    jobTitle: lead.jobTitle || '',
+    email: lead.email || '',
+    phone: lead.phone || '',
+    linkedinUrl: lead.linkedinUrl || '',
+  };
+
+  const regex = /{{([\s\S]*?)}}/g;
   const matches = body.matchAll(regex);
 
-  const firstName = lead.fullName?.trim().split(' ')[0] || '';
-
   for (const match of matches) {
-    const variableName = match[1].trim().toLowerCase();
+    const rawVariableName = match[1].trim();
+    const variableName = rawVariableName.toLowerCase();
     const fieldKey = ALIASES[variableName];
     
     if (fieldKey) {
-      if (fieldKey === 'firstName') {
-        if (!firstName) missing.push(variableName);
-      } else {
-        const value = lead[fieldKey];
-        if (!value || String(value).trim() === '') {
-          missing.push(variableName);
-        }
+      const value = values[fieldKey];
+      if (!value || value.trim() === '') {
+        missing.push(rawVariableName);
       }
     }
   }
 
+  // Retorna nomes únicos para evitar duplicidade em alertas
   return Array.from(new Set(missing));
 }

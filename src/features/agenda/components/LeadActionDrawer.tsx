@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, getLinkedinProfileUrl, getGmailComposeUrl, getWhatsAppUrl } from '@/lib/utils';
-import { interpolateTemplate } from '@/lib/templates';
+import { interpolateTemplate, getMissingFields } from '@/lib/templates';
 import { useState, useEffect } from 'react';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { useOperator } from '@/components/providers/OperatorProvider';
@@ -28,6 +28,7 @@ import { advanceCadenceStage, pauseLeadCadence, resumeLeadCadence, lockLead, unl
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AlertTriangle } from 'lucide-react';
 
 interface LeadActionDrawerProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [compiledText, setCompiledText] = useState('');
   const { activeOperator } = useOperator();
 
   // Trava o lead ao abrir para evitar conflitos (Smart Locking)
@@ -72,12 +74,16 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
 
   const nextStage = leadProgress.cadence.stages.find((s: any) => s.order === leadProgress.currentStageOrder + 1);
 
-  // Função para processar variáveis no corpo do template (Robusta e Multi-idioma via central lib)
-  const processTemplate = (body: string) => {
-    return interpolateTemplate(body, leadProgress.lead);
-  };
-
   const selectedTemplate = filteredTemplates.find(t => t.id === selectedTemplateId);
+
+  // Sincroniza o texto compilado sempre que o lead ou template mudar
+  useEffect(() => {
+    if (selectedTemplate && leadProgress?.lead) {
+      setCompiledText(interpolateTemplate(selectedTemplate.body, leadProgress.lead));
+    } else {
+      setCompiledText('');
+    }
+  }, [selectedTemplate, leadProgress?.lead]);
 
   const handleExecute = async (result: 'SENT' | 'REPLIED' | 'FAILED') => {
     if (!activeOperator) {
@@ -228,12 +234,38 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                           </div>
                        </div>
 
+                       {/* Preview do Texto */}
+                       {selectedTemplate && (
+                         <div className="space-y-2 mt-2">
+                            <div className="flex items-center justify-between px-1">
+                               <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest">Pré-visualização</label>
+                               {getMissingFields(selectedTemplate.body, leadProgress.lead).length > 0 && (
+                                 <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full">
+                                   <AlertTriangle className="w-3 h-3" /> Campos pendentes
+                                 </span>
+                               )}
+                            </div>
+                            <div className="relative bg-white dark:bg-slate-950 border border-indigo-50 dark:border-indigo-900/40 rounded-2xl p-4 shadow-inner">
+                               <textarea
+                                 value={compiledText}
+                                 onChange={(e) => setCompiledText(e.target.value)}
+                                 className="w-full bg-transparent border-none text-sm font-medium text-slate-700 dark:text-slate-300 resize-none outline-none focus:ring-0 h-24"
+                               />
+                               <div className="absolute top-2 right-2 flex gap-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-200" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-200" />
+                                </div>
+                            </div>
+                         </div>
+                       )}
+
                        <button 
                          onClick={() => {
                            if (!selectedTemplate) return toast.error('Selecione um template primeiro');
-                           const processed = processTemplate(selectedTemplate.body);
-                           navigator.clipboard.writeText(processed);
-                           toast.success('Template personalizado copiado!');
+                           
+                           // Usa o texto que está na área de preview (permite edições de última hora)
+                           navigator.clipboard.writeText(compiledText);
+                           toast.success('Abordagem copiada para transferência!');
                            
                            // Redirecionamento Baseado no Canal
                            const lead = leadProgress.lead;
@@ -242,9 +274,9 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                            if (currentStage?.channel === 'LINKEDIN') {
                              url = getLinkedinProfileUrl(lead.linkedinUrl);
                            } else if (currentStage?.channel === 'EMAIL') {
-                             url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, processed);
+                             url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, compiledText);
                            } else if (currentStage?.channel === 'WHATSAPP') {
-                             url = getWhatsAppUrl(lead.phone, processed);
+                             url = getWhatsAppUrl(lead.phone, compiledText);
                            }
 
                            if (url) {
@@ -253,7 +285,7 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                              }, 100);
                            }
                          }}
-                         className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-dashed border-indigo-200 dark:border-indigo-800 rounded-2xl text-sm font-black text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-all active:scale-95"
+                         className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100 dark:shadow-none"
                        >
                           <Copy className="w-4 h-4" /> Copiar & Abrir Canal
                        </button>

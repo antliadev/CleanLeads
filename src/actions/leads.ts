@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
-import type { LeadStatus } from '../generated/client';
+import type { LeadStatus } from '@prisma/client';
 import { getAuthProfile } from './auth';
 
 // ═══════════════════════
