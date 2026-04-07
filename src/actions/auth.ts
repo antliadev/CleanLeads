@@ -72,89 +72,50 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
 }
 
 // ═══════════════════════════════════════════
-// Registro - Etapa 1 (Email -> Enviar Código)
+// Registro Simplificado (Email, Nome e Senha em um passo)
 // ═══════════════════════════════════════════
-export async function requestSignupCode(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const email = formData.get('email') as string;
-  const parsed = registerStep1Schema.safeParse({ email });
-  
+export async function register(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = registerStep3Schema.safeParse(raw); // Usando o esquema de dados finais (nome, senha)
+  const emailParsed = registerStep1Schema.safeParse(raw); // Usando o esquema de e-mail
+
+  if (!emailParsed.success) {
+    return { success: false, error: emailParsed.error.issues[0].message };
+  }
+
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
   const supabase = await createServerSupabase();
-  
-  // Usamos signInWithOtp para enviar o código. 
-  // No Supabase, isso cria um usuário "provisório" se ele não existir.
-  const { error } = await supabase.auth.signInWithOtp({
-    email: parsed.data.email,
-    options: {
-      shouldCreateUser: true,
-    }
-  });
 
-  if (error) {
-    return { success: false, error: 'Erro ao enviar código. Tente novamente em instantes.' };
-  }
-
-  return { success: true, step: 'verify_needed', email: parsed.data.email };
-}
-
-// ═══════════════════════════════════════════
-// Registro - Etapa 2 (Validar Código)
-// ═══════════════════════════════════════════
-export async function verifySignupCode(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const email = formData.get('email') as string;
-  const code = formData.get('code') as string;
-  
-  if (!email || !code || code.length < 6) {
-    return { success: false, error: 'O código deve ter 6 dígitos', step: 'verify_needed', email };
-  }
-
-  const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.verifyOtp({
-    email,
-    token: code,
-    type: 'email' // OTP enviado via signInWithOtp usa tipo 'email' ou 'magiclink'
-  });
-
-  if (error) {
-    return { success: false, error: 'Código incorreto ou expirado.', step: 'verify_needed', email };
-  }
-
-  // Se verificado, o usuário está logado temporariamente. Vamos para a etapa de completar cadastro.
-  return { success: true, step: 'complete_needed', email };
-}
-
-// ═══════════════════════════════════════════
-// Registro - Etapa 3 (Nome e Senha)
-// ═══════════════════════════════════════════
-export async function completeSignup(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = registerStep3Schema.safeParse(raw);
-  
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0].message, step: 'complete_needed' };
-  }
-
-  const supabase = await createServerSupabase();
-  
-  // Atualiza os metadados (nome) e define a senha permanente
-  const { error } = await supabase.auth.updateUser({
+  // Realiza o cadastro completo diretamente
+  const { data, error } = await supabase.auth.signUp({
+    email: emailParsed.data.email,
     password: parsed.data.password,
-    data: {
-      full_name: parsed.data.name,
+    options: {
+      data: {
+        full_name: parsed.data.name,
+      }
     }
   });
 
   if (error) {
-    return { success: false, error: 'Erro ao finalizar cadastro: ' + error.message, step: 'complete_needed' };
+    return { success: false, error: 'Erro ao realizar cadastro: ' + error.message };
   }
 
-  // Sincroniza com o perfil no Prisma antes de redirecionar
-  await getAuthProfile();
+  // Se o usuário foi criado e a sessão iniciada (configuração do Supabase permite autologin)
+  if (data.session) {
+    // Sincroniza com o perfil no Prisma antes de redirecionar
+    await getAuthProfile();
+    redirect('/leads');
+  }
 
-  redirect('/leads');
+  // Caso precise confirmar e-mail (depende da config do Supabase Dashboard)
+  return { 
+    success: true, 
+    error: data.user && !data.session ? 'Cadastro realizado! Verifique seu e-mail para confirmar a conta.' : undefined 
+  };
 }
 
 // ═══════════════════════════════════════════
