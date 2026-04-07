@@ -53,7 +53,7 @@ const ALIASES: Record<string, keyof LeadData | 'firstName'> = {
  * Tratamento robusto via Regex Global para substituir todas as ocorrências de forma atômica.
  */
 export function interpolateTemplate(body: string, lead: LeadData): string {
-  if (!body) return '';
+  if (!body || !lead) return '';
 
   // Extração robusta do primeiro nome (trata múltiplos espaços e nulos)
   const firstName = lead.fullName?.trim().split(/\s+/)[0] || '';
@@ -97,7 +97,7 @@ export function interpolateTemplate(body: string, lead: LeadData): string {
  * Útil para exibir alertas visuais na UI.
  */
 export function getMissingFields(body: string, lead: LeadData): string[] {
-  if (!body) return [];
+  if (!body || !lead) return [];
 
   const missing: string[] = [];
   const firstName = lead.fullName?.trim().split(/\s+/)[0] || '';
