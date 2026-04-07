@@ -64,16 +64,6 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
     }
   }, [isOpen, currentStage, filteredTemplates, selectedTemplateId]);
 
-  if (!isOpen || !leadProgress) return null;
-
-  // Verifica se está travado por outro (menos de 5 minutos atrás)
-  const isLockedByOthers = 
-    leadProgress.lockedAt && 
-    leadProgress.lockedBy !== activeOperator?.name &&
-    (new Date().getTime() - new Date(leadProgress.lockedAt).getTime()) < 5 * 60 * 1000;
-
-  const nextStage = leadProgress.cadence.stages.find((s: any) => s.order === leadProgress.currentStageOrder + 1);
-
   const selectedTemplate = filteredTemplates.find(t => t.id === selectedTemplateId);
 
   // Sincroniza o texto compilado sempre que o lead ou template mudar
@@ -84,6 +74,16 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
       setCompiledText('');
     }
   }, [selectedTemplate, leadProgress?.lead]);
+
+  if (!isOpen || !leadProgress) return null;
+
+  // Verifica se está travado por outro (menos de 5 minutos atrás)
+  const isLockedByOthers = 
+    leadProgress.lockedAt && 
+    leadProgress.lockedBy !== activeOperator?.name &&
+    (new Date().getTime() - new Date(leadProgress.lockedAt).getTime()) < 5 * 60 * 1000;
+
+  const nextStage = leadProgress.cadence.stages.find((s: any) => s.order === leadProgress.currentStageOrder + 1);
 
   const handleExecute = async (result: 'SENT' | 'REPLIED' | 'FAILED') => {
     if (!activeOperator) {
