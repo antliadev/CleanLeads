@@ -13,6 +13,7 @@ export function LeadFilters() {
 
   const currentSearch = searchParams.get('search') || '';
   const currentStatus = searchParams.get('status') || '';
+  const currentStage = searchParams.get('stage') || '';
   
   // Estado local para o input (não dispara busca imediata)
   const [localSearch, setLocalSearch] = useState(currentSearch);
@@ -54,7 +55,7 @@ export function LeadFilters() {
     });
   };
 
-  const hasFilters = currentSearch || currentStatus;
+  const hasFilters = currentSearch || currentStatus || currentStage;
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -104,6 +105,26 @@ export function LeadFilters() {
         {Object.entries(LEAD_STATUS_MAP).map(([value, { label }]) => (
           <option key={value} value={value}>{label}</option>
         ))}
+      </select>
+
+      {/* Filtro de Estágio - Seletor Visual */}
+      <select
+        value={currentStage}
+        onChange={(e) => updateUrl({ stage: e.target.value })}
+        className={cn(
+          'border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 shadow-sm transition-colors',
+          'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 cursor-pointer',
+          isPending && 'opacity-60'
+        )}
+      >
+        <option value="">Todos os estágios</option>
+        <option value="none">Sem Cadência</option>
+        <option value="1">Passo 1 - LinkedIn</option>
+        <option value="2">Passo 2 - LinkedIn</option>
+        <option value="3">Passo 3 - E-mail</option>
+        <option value="4">Passo 4 - WhatsApp</option>
+        <option value="5">Passo 5 - LinkedIn</option>
+        <option value="6">Passo 6 - E-mail</option>
       </select>
 
       {/* Botoes de Limpeza */}

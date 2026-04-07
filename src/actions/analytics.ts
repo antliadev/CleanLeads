@@ -30,6 +30,7 @@ export async function getAnalytics() {
     byStatus,
     bySource,
     cadenceStats,
+    activeLeads,
   ] = await Promise.all([
     // Total
     prisma.lead.count({ where: { profileId: profile.id } }),
@@ -54,10 +55,18 @@ export async function getAnalytics() {
       where: { profileId: profile.id, status: 'ACTIVE' },
       _count: { currentStageOrder: true },
     }),
+    // Leads Ativos (Exclui Convertidos, Perdidos e Pausados)
+    prisma.lead.count({ 
+      where: { 
+        profileId: profile.id,
+        status: { notIn: ['CONVERTIDO', 'PERDIDO', 'PAUSADO'] }
+      } 
+    }),
   ]);
 
   return {
     totalLeads,
+    activeLeads,
     byStatus: byStatus.map((s) => ({ status: s.status, count: s._count.status })),
     bySource: bySource.map((s) => ({ source: s.source, count: s._count.source })),
     cadenceStats: cadenceStats.map(s => ({ stage: s.currentStageOrder, count: s._count.currentStageOrder })),

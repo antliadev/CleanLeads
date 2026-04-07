@@ -148,11 +148,33 @@ export async function advanceCadenceStage(props: {
       }
     });
 
-    // 3. Atualiza o Lead (Status Comercial se necessário)
+    // 3. Atualiza o Lead (Status COMERCIAL sincronizado)
+    let commercialStatus: any = undefined;
+    
     if (props.result === 'REPLIED') {
+      commercialStatus = 'CONTATADO';
+    } else if (props.result === 'SENT') {
+      commercialStatus = 'AGUARDANDO_RETORNO';
+    } else if (props.result === 'FAILED') {
+      commercialStatus = 'PERDIDO';
+    }
+
+    if (commercialStatus) {
       await tx.lead.update({
         where: { id: current.leadId },
-        data: { status: 'CONTATADO', lastOperatorId: props.operatorId }
+        data: { 
+          status: commercialStatus, 
+          lastOperatorId: props.operatorId 
+        }
+      });
+      
+      // Registra a alteração no histórico de notas para auditoria operacional
+      await tx.leadNote.create({
+        data: {
+          leadId: current.leadId,
+          operatorId: props.operatorId,
+          content: `[SISTEMA] Status alterado para ${commercialStatus} via Agenda`
+        }
       });
     }
 
@@ -188,7 +210,7 @@ export async function advanceCadenceStage(props: {
       }
     });
 
-    revalidatePath('/agenda');
+    revalidatePath('/');
     return updated;
   });
 }
@@ -210,6 +232,11 @@ export async function pauseLeadCadence(progressId: string, operatorId: string, r
       }
     });
 
+    await tx.lead.update({
+      where: { id: progress.leadId },
+      data: { status: 'PAUSADO', lastOperatorId: operatorId }
+    });
+
     await tx.leadCadenceEvent.create({
       data: {
         leadCadenceProgressId: progressId,
@@ -219,6 +246,16 @@ export async function pauseLeadCadence(progressId: string, operatorId: string, r
         notes: reason || 'Pausado manualmente'
       }
     });
+    
+    await tx.leadNote.create({
+      data: {
+        leadId: progress.leadId,
+        operatorId,
+        content: `[SISTEMA] Status alterado para PAUSADO via Agenda`
+      }
+    });
+
+    revalidatePath('/leads');
 
     revalidatePath('/agenda');
     return progress;

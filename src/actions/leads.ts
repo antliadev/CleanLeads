@@ -18,7 +18,7 @@ const leadSchema = z.object({
   phone: z.string().optional(),
   linkedinUrl: z.string().url('URL LinkedIn inválida').optional().or(z.literal('')),
   whatsappUrl: z.string().url('URL WhatsApp inválida').optional().or(z.literal('')),
-  status: z.enum(['NOVO', 'AGUARDANDO_CONEXAO', 'AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'CONVERTIDO', 'PERDIDO']).default('NOVO'),
+  status: z.enum(['NOVO', 'AGUARDANDO_CONEXAO', 'AGUARDANDO_RETORNO', 'CONTATADO', 'EM_NEGOCIACAO', 'CONVERTIDO', 'PERDIDO', 'PAUSADO']).default('NOVO'),
   notes: z.string().optional(),
   customSource: z.string().optional(),
   operatorId: z.string().min(1, 'Operador obrigatório'),
@@ -33,10 +33,12 @@ export async function getLeads({
   page = 1,
   search = '',
   status = '',
+  stage = '',
 }: {
   page?: number;
   search?: string;
   status?: string;
+  stage?: string;
 } = {}) {
   const profile = await getAuthProfile();
   if (!profile) throw new Error('Não autorizado');
@@ -54,6 +56,12 @@ export async function getLeads({
       ],
     }),
     ...(status && { status: status as LeadStatus }),
+    ...(stage && {
+      ...(stage === 'none' 
+        ? { cadenceEngine: null } 
+        : { cadenceEngine: { currentStageOrder: parseInt(stage) } }
+      )
+    }),
   };
 
   const [leads, total] = await Promise.all([
@@ -70,7 +78,22 @@ export async function getLeads({
         cadenceEngine: {
           select: {
             status: true,
-            currentStageOrder: true
+            currentStageOrder: true,
+            cadence: {
+              select: {
+                stages: {
+                  select: {
+                    order: true,
+                    channel: true,
+                    template: {
+                      select: {
+                        name: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Copy, ExternalLink, Check, Mail, MessageCircle, Loader2, MessageSquare } from 'lucide-react';
 import { Template, TemplateChannel, LeadStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
-import { parseTemplate } from '@/lib/template-parser';
+import { interpolateTemplate } from '@/lib/templates';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { getGmailComposeUrl, getWhatsAppUrl, cn } from '@/lib/utils';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
@@ -81,8 +81,8 @@ export function ContactActionModal({
     }
     const template = activeTemplates.find((t) => t.id === selectedTemplateId);
     if (template) {
-      setCompiledSubject(parseTemplate(template.subject || '', lead));
-      setCompiledText(parseTemplate(template.body, lead));
+      setCompiledSubject(interpolateTemplate(template.subject || '', lead));
+      setCompiledText(interpolateTemplate(template.body, lead));
     } else {
       setCompiledSubject('');
       setCompiledText('');

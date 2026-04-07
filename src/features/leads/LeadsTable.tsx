@@ -154,7 +154,8 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                   </th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Lead</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Contato</th>
-                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Status</th>
+                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Estágio</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Origem</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Follow-up</th>
                   <th className="text-left px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Último Operador</th>
@@ -234,9 +235,46 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                         </div>
                       </td>
 
-                      {/* Status */}
+                       {/* Status */}
                       <td className="px-6 py-4">
                         <StatusBadge status={lead.status} />
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {(lead as any).cadenceEngine ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-md font-black uppercase border transition-all",
+                                (lead as any).cadenceEngine.status === 'ACTIVE' 
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm" 
+                                  : "bg-amber-50 text-amber-700 border-amber-200 shadow-sm"
+                              )}>
+                                {(() => {
+                                  const engine = (lead as any).cadenceEngine;
+                                  const stage = engine.cadence?.stages?.find((s: any) => s.order === engine.currentStageOrder);
+                                  const channel = stage?.channel || 'Ação';
+                                  return `Passo ${engine.currentStageOrder} - ${channel}`;
+                                })()}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold truncate max-w-[150px] ml-1" title={
+                              (() => {
+                                const engine = (lead as any).cadenceEngine;
+                                const stage = engine.cadence?.stages?.find((s: any) => s.order === engine.currentStageOrder);
+                                return stage?.template?.name || 'Sem nome';
+                              })()
+                            }>
+                              {(() => {
+                                const engine = (lead as any).cadenceEngine;
+                                const stage = engine.cadence?.stages?.find((s: any) => s.order === engine.currentStageOrder);
+                                return stage?.template?.name || 'Manual';
+                              })()}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-600 font-medium italic">Sem Cadência</span>
+                        )}
                       </td>
 
                       {/* Origem */}
@@ -256,7 +294,7 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                         )}
                       </td>
 
-                      {/* Follow-up / Cadência */}
+                       {/* Follow-up / Cadência */}
                       <td className="px-6 py-4">
                         {(lead as any).cadenceEngine ? (
                           <div className="flex flex-col gap-1">
@@ -264,11 +302,10 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                               "text-[10px] inline-flex items-center px-2 py-0.5 rounded-md font-bold uppercase",
                               (lead as any).cadenceEngine.status === 'ACTIVE' 
                                 ? "bg-emerald-50 text-emerald-600 border border-emerald-100" 
-                                : "bg-slate-50 text-slate-400 border border-slate-100"
+                                : "bg-orange-50 text-orange-600 border border-orange-100"
                             )}>
-                              {(lead as any).cadenceEngine.status === 'ACTIVE' ? 'Em Cadência' : 'Cadência Pausada'}
+                              {(lead as any).cadenceEngine.status === 'ACTIVE' ? 'Ativa' : 'Pausada'}
                             </span>
-                            <span className="text-[9px] text-slate-400 font-medium">Estágio {(lead as any).cadenceEngine.currentStageOrder}</span>
                           </div>
                         ) : (
                           <button

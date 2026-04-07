@@ -182,6 +182,7 @@ enum LeadStatus {
   EM_NEGOCIACAO
   CONVERTIDO
   PERDIDO
+  PAUSADO
 }
 
 enum LeadSource {

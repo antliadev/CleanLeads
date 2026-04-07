@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, getLinkedinProfileUrl, getGmailComposeUrl, getWhatsAppUrl } from '@/lib/utils';
+import { interpolateTemplate } from '@/lib/templates';
 import { useState, useEffect } from 'react';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { useOperator } from '@/components/providers/OperatorProvider';
@@ -71,15 +72,9 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
 
   const nextStage = leadProgress.cadence.stages.find((s: any) => s.order === leadProgress.currentStageOrder + 1);
 
-  // Função para processar variáveis no corpo do template
+  // Função para processar variáveis no corpo do template (Robusta e Multi-idioma via central lib)
   const processTemplate = (body: string) => {
-    if (!body) return '';
-    return body
-      .replace(/{{name}}/g, leadProgress.lead.fullName || '')
-      .replace(/{{company}}/g, leadProgress.lead.company || '')
-      .replace(/{{cargo}}/g, leadProgress.lead.jobTitle || '')
-      .replace(/{{email}}/g, leadProgress.lead.email || '')
-      .replace(/{{telefone}}/g, leadProgress.lead.phone || '');
+    return interpolateTemplate(body, leadProgress.lead);
   };
 
   const selectedTemplate = filteredTemplates.find(t => t.id === selectedTemplateId);

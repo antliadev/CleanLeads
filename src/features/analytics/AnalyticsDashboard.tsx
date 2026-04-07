@@ -15,6 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
   EM_NEGOCIACAO: '#8b5cf6',
   CONVERTIDO: '#10b981',
   PERDIDO: '#f43f5e',
+  PAUSADO: '#94a3b8',
 };
 
 const SOURCE_COLORS = ['#6366f1', '#06b6d4', '#10b981'];
@@ -22,6 +23,7 @@ const SOURCE_COLORS = ['#6366f1', '#06b6d4', '#10b981'];
 interface Props {
   data: {
     totalLeads: number;
+    activeLeads: number;
     byStatus: { status: string; count: number }[];
     bySource: { source: string; count: number }[];
     cadenceStats: { stage: number; count: number }[];
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export function AnalyticsDashboard({ data }: Props) {
-  const { totalLeads, byStatus, bySource } = data;
+  const { totalLeads, activeLeads, byStatus, bySource } = data;
 
   const converted = byStatus.find((s) => s.status === 'CONVERTIDO')?.count ?? 0;
   const conversionRate = totalLeads > 0 ? ((converted / totalLeads) * 100).toFixed(1) : '0';
@@ -51,10 +53,10 @@ export function AnalyticsDashboard({ data }: Props) {
       {/* Cards de métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[
-          { label: 'Total de Leads', value: totalLeads, icon: Users, color: 'indigo' },
+          { label: 'Leads Ativos', value: activeLeads, icon: Users, color: 'indigo' },
           { label: 'Novos', value: newLeads, icon: TrendingUp, color: 'blue' },
           { label: 'Convertidos', value: converted, icon: CheckCircle2, color: 'emerald' },
-          { label: 'Taxa de Conversão', value: `${conversionRate}%`, icon: Target, color: 'violet' },
+          { label: 'Base Total', value: totalLeads, icon: Target, color: 'violet' },
         ].map((card, i) => (
           <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 hover:shadow-lg transition-all">
             <div className={`w-10 h-10 rounded-2xl bg-${card.color}-50 dark:bg-${card.color}-950/50 flex items-center justify-center mb-4`}>

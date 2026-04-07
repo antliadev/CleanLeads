@@ -20,7 +20,8 @@ export async function checkUrgencyState() {
       profileId: profile.id,
       status: 'ACTIVE',
       nextScheduledAt: { lt: now },
-      finishedAt: null
+      finishedAt: null,
+      lead: { status: { not: 'PAUSADO' } }
     },
     include: { lead: true }
   });

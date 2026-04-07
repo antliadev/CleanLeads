@@ -6,6 +6,7 @@ import {
   XCircle,
   UserPlus,
   Hourglass,
+  PauseCircle,
 } from 'lucide-react';
 
 /**
@@ -46,6 +47,11 @@ export const LEAD_STATUS_MAP = {
     label: 'Perdido',
     color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800/50',
     icon: XCircle,
+  },
+  PAUSADO: {
+    label: 'Pausado',
+    color: 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900/30 dark:text-slate-400 dark:border-slate-800/50',
+    icon: PauseCircle,
   },
 } as const;
 
