@@ -119,51 +119,70 @@ export async function register(_prevState: AuthResult | null, formData: FormData
 }
 
 // ═══════════════════════════════════════════
-// Recuperação - Etapa 1 (Solicitar Código)
+// Recuperação - Reset Direto Público (Solicitado User)
 // ═══════════════════════════════════════════
-export async function requestRecoveryCode(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const email = formData.get('email') as string;
-  const parsed = recoveryStep1Schema.safeParse({ email });
+export async function directResetPassword(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
+  const raw = Object.fromEntries(formData.entries());
+  
+  // Usamos um schema combinado
+  const schema = z.object({
+    email: z.string().email(),
+    password: z.string().min(6),
+    confirmPassword: z.string()
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: "As senhas não coincidem",
+    path: ["confirmPassword"],
+  });
+
+  const parsed = schema.safeParse(raw);
 
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email);
+  const { email, password: newPassword } = parsed.data;
 
-  if (error) {
-    // Por segurança, não confirmamos se o e-mail existe, 
-    // mas o Supabase costuma retornar sucesso mesmo se não existir dependendo da config.
-    return { success: false, error: 'Erro ao processar solicitação. Tente novamente.' };
+  try {
+    // Para atualizar um usuário NÃO AUTENTICADO pelo e-mail,
+    // a única via no Supabase é usando o Admin API via Service Role Key.
+    // Garantimos que seja importado do novo client:
+    const { createAdminSupabase } = await import('@/lib/supabase/server');
+    const supabaseAdmin = createAdminSupabase();
+
+    // Buscar ID do usuário primeiro via prisma, ou via listUsers fallback
+    const profile = await prisma.profile.findUnique({ where: { email } });
+    let targetUserId = profile?.authUid;
+
+    if (!targetUserId) {
+      const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      if (!listError) {
+        const u = usersData.users.find((user) => user.email === email);
+        if (u) targetUserId = u.id;
+      }
+    }
+
+    if (!targetUserId) {
+      return { success: false, error: 'E-mail não encontrado no sistema.' };
+    }
+
+    // Executa a troca forçada de senha
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      targetUserId,
+      {
+        password: newPassword,
+        email_confirm: true,
+      }
+    );
+
+    if (updateError) {
+      return { success: false, error: 'Falha do provedor ao redefinir a senha.' };
+    }
+
+    return { success: true, message: 'Senha redefinida com sucesso!' };
+  } catch (err: any) {
+    // Provável erro de Service Role Key ausente no Vercel
+    return { success: false, error: 'Acesso Administrativo não autorizado ou mal configurado no servidor: ' + err.message };
   }
-
-  return { success: true, step: 'recovery_verify_needed', email: parsed.data.email };
-}
-
-// ═══════════════════════════════════════════
-// Recuperação - Etapa 2 (Validar Código)
-// ═══════════════════════════════════════════
-export async function verifyRecoveryCode(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
-  const email = formData.get('email') as string;
-  const code = formData.get('code') as string;
-
-  if (!email || !code || code.length < 6) {
-    return { success: false, error: 'Código inválido', step: 'recovery_verify_needed', email };
-  }
-
-  const supabase = await createServerSupabase();
-  const { error } = await supabase.auth.verifyOtp({
-    email,
-    token: code,
-    type: 'recovery' // Tipo específico para recuperação de senha
-  });
-
-  if (error) {
-    return { success: false, error: 'Código incorreto ou expirado.', step: 'recovery_verify_needed', email };
-  }
-
-  return { success: true, step: 'reset_password_needed', email };
 }
 
 // ═══════════════════════════════════════════
