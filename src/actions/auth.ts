@@ -44,6 +44,7 @@ const resetPasswordSchema = z.object({
 export type AuthResult = {
   success: boolean;
   error?: string;
+  message?: string;
   step?: 'verify_needed' | 'complete_needed' | 'recovery_verify_needed' | 'reset_password_needed';
   email?: string;
 };

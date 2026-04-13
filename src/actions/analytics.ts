@@ -67,8 +67,8 @@ export async function getAnalytics() {
   return {
     totalLeads,
     activeLeads,
-    byStatus: byStatus.map((s) => ({ status: s.status, count: s._count.status })),
-    bySource: bySource.map((s) => ({ source: s.source, count: s._count.source })),
-    cadenceStats: cadenceStats.map(s => ({ stage: s.currentStageOrder, count: s._count.currentStageOrder })),
+    byStatus: byStatus.map((s: any) => ({ status: s.status, count: s._count.status })),
+    bySource: bySource.map((s: any) => ({ source: s.source, count: s._count.source })),
+    cadenceStats: cadenceStats.map((s: any) => ({ stage: s.currentStageOrder, count: s._count.currentStageOrder })),
   };
 }
