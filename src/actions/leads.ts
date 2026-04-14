@@ -58,13 +58,8 @@ export async function getLeads({
     ...(status && { status: status as LeadStatus }),
     ...(stage && {
       ...(stage === 'none' 
-        ? { cadenceEngine: null } 
-        : { 
-            cadenceEngine: {
-              isNot: null,
-              currentStageOrder: parseInt(stage)
-            }
-          }
+        ? { NOT: { cadenceEngine: { id: { not: '' } } } } 
+        : { cadenceEngine: { currentStageOrder: parseInt(stage) } }
       )
     }),
   };
