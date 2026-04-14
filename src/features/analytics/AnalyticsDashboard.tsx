@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, CartesianGrid,
 } from 'recharts';
-import { Users, Target, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Users, Target, TrendingUp, CheckCircle2, ArrowRight, TrendingDown, Clock } from 'lucide-react';
 import { LEAD_STATUS_MAP, LEAD_SOURCE_MAP } from '@/lib/constants';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -17,6 +17,15 @@ const STATUS_COLORS: Record<string, string> = {
   PERDIDO: '#f43f5e',
   PAUSADO: '#94a3b8',
 };
+
+const STAGE_COLORS = [
+  '#6366f1', // Estágio 1 - Indigo
+  '#8b5cf6', // Estágio 2 - Violet
+  '#a855f7', // Estágio 3 - Purple
+  '#d946ef', // Estágio 4 - Fuchsia
+  '#ec4899', // Estágio 5 - Pink
+  '#f43f5e', // Estágio 6 - Rose
+];
 
 const SOURCE_COLORS = ['#6366f1', '#06b6d4', '#10b981'];
 
@@ -48,6 +57,22 @@ export function AnalyticsDashboard({ data }: Props) {
     value: s.count,
   }));
 
+  // Preparar dados dos estágios para o gráfico
+  const stageData = (data as any).cadenceStats || [];
+  const sortedStages = [...stageData].sort((a: any, b: any) => a.stage - b.stage);
+  const totalInPipeline = sortedStages.reduce((acc: number, s: any) => acc + s.count, 0);
+
+  // Calcular percentages e criar dados para o funil
+  const funnelData = sortedStages.map((stage: any, index: number) => {
+    const percentage = totalInPipeline > 0 ? ((stage.count / totalInPipeline) * 100).toFixed(1) : '0';
+    return {
+      ...stage,
+      percentage: parseFloat(percentage),
+      color: STAGE_COLORS[index % STAGE_COLORS.length],
+      width: totalInPipeline > 0 ? (stage.count / totalInPipeline) * 100 : 0,
+    };
+  });
+
   return (
     <div className="space-y-8">
       {/* Cards de métricas */}
@@ -58,8 +83,8 @@ export function AnalyticsDashboard({ data }: Props) {
           { label: 'Convertidos', value: converted, icon: CheckCircle2, color: 'emerald' },
           { label: 'Base Total', value: totalLeads, icon: Target, color: 'violet' },
         ].map((card, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 hover:shadow-lg transition-all">
-            <div className={`w-10 h-10 rounded-2xl bg-${card.color}-50 dark:bg-${card.color}-950/50 flex items-center justify-center mb-4`}>
+          <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 hover:shadow-lg transition-all">
+            <div className={`w-10 h-10 rounded-xl bg-${card.color}-50 dark:bg-${card.color}-950/50 flex items-center justify-center mb-3`}>
               <card.icon className={`w-5 h-5 text-${card.color}-600 dark:text-${card.color}-400`} />
             </div>
             <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{card.label}</p>
@@ -71,14 +96,14 @@ export function AnalyticsDashboard({ data }: Props) {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Funil por status */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Funil por Status</h3>
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 transition-colors">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Funil por Status</h3>
           {statusChartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart data={statusChartData} layout="vertical">
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -97,17 +122,17 @@ export function AnalyticsDashboard({ data }: Props) {
         </div>
 
         {/* Distribuição por Status */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Distribuição por Status</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 transition-colors">
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Distribuição por Status</h3>
           {statusChartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
               Nenhum dado disponível
             </div>
           ) : (
             <>
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={140}>
                 <PieChart>
-                  <Pie data={statusChartData} dataKey="value" innerRadius={50} outerRadius={75} paddingAngle={3}>
+                  <Pie data={statusChartData} dataKey="value" innerRadius={40} outerRadius={65} paddingAngle={3}>
                     {statusChartData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
@@ -115,12 +140,12 @@ export function AnalyticsDashboard({ data }: Props) {
                   <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="space-y-2 mt-4">
-                {statusChartData.map((item, i) => (
+              <div className="space-y-2 mt-2">
+                {statusChartData.slice(0, 5).map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
-                      <span className="text-slate-600 dark:text-slate-300">{item.name}</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
+                      <span className="text-slate-600 dark:text-slate-300 truncate max-w-[100px]">{item.name}</span>
                     </div>
                     <span className="font-bold text-slate-900 dark:text-white">{item.value}</span>
                   </div>
@@ -131,52 +156,124 @@ export function AnalyticsDashboard({ data }: Props) {
         </div>
       </div>
 
-      {/* Funil de Cadência (Novo) */}
-      {(data as any).cadenceStats && (data as any).cadenceStats.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 transition-colors">
-          <div className="flex items-center justify-between mb-8">
+      {/* Pipeline de Estágios - Visualização Inteligente */}
+      {funnelData.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 transition-colors">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Funil de Distribuição da Cadência</h3>
-              <p className="text-sm text-slate-500 font-medium">Quantidade de leads ativos em cada estágio da prospecção</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Pipeline de Estágios</h3>
+              <p className="text-sm text-slate-500 font-medium">Fluxo de leads pela cadência de prospecção</p>
             </div>
-            <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-100 dark:border-emerald-800">
-               <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Pipeline Ativo</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+                <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">{totalInPipeline} ativos</span>
+              </div>
             </div>
           </div>
-          
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart 
-              data={(data as any).cadenceStats.sort((a: any, b: any) => a.stage - b.stage)} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-            >
-              <defs>
-                <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={1} />
-                  <stop offset="95%" stopColor="#818cf8" stopOpacity={0.8} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="stage" 
-                label={{ value: 'Estágio', position: 'insideBottomRight', offset: -10, fontSize: 10, fill: '#94a3b8' }}
-                tick={{ fontSize: 12, fontWeight: 'bold', fill: '#64748b' }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-              <Tooltip 
-                cursor={{ fill: 'rgba(99, 102, 241, 0.05)', radius: 10 }}
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)', padding: '12px' }}
-                formatter={(v) => [`${v} leads`, 'Ativos']}
-                labelFormatter={(label) => `Estágio ${label}`}
-              />
-              <Bar dataKey="count" fill="url(#barGrad)" radius={[10, 10, 0, 0]} maxBarSize={60}>
-                 {(data as any).cadenceStats.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fillOpacity={1 - (index * 0.1)} />
-                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+
+          {/* Visualização do Funil */}
+          <div className="relative mb-6">
+            <div className="flex items-end justify-center gap-2 h-32">
+              {funnelData.map((stage: any, index: number) => (
+                <div
+                  key={stage.stage}
+                  className="relative flex flex-col items-center group"
+                  style={{ height: `${Math.max(stage.width * 0.8, 20)}%`, width: `${100 / funnelData.length - 5}%` }}
+                >
+                  <div
+                    className="w-full rounded-t-lg transition-all duration-500 group-hover:opacity-90"
+                    style={{
+                      height: '100%',
+                      background: `linear-gradient(180deg, ${stage.color} 0%, ${stage.color}99 100%)`,
+                      boxShadow: `0 -4px 20px ${stage.color}40`
+                    }}
+                  />
+                  <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center">
+                    <span className="text-xs font-black text-slate-400 uppercase">E{stage.stage}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cards de Estágio com Detalhes */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {funnelData.map((stage: any, index: number) => {
+              const prevStage = index > 0 ? funnelData[index - 1] : null;
+              const drop = prevStage ? prevStage.count - stage.count : 0;
+              const dropPercentage = prevStage ? ((drop / prevStage.count) * 100).toFixed(0) : 0;
+              
+              return (
+                <div
+                  key={stage.stage}
+                  className="p-4 rounded-xl border transition-all hover:shadow-md"
+                  style={{
+                    backgroundColor: `${stage.color}08`,
+                    borderColor: `${stage.color}30`
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: stage.color }}
+                    >
+                      <span className="text-xs font-black text-white">{stage.stage}</span>
+                    </div>
+                    <span className="text-2xl font-black text-slate-800 dark:text-slate-100">{stage.count}</span>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-slate-500">{stage.percentage}% do pipeline</p>
+                    {drop > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-rose-500">
+                        <TrendingDown className="w-3 h-3" />
+                        <span>-{drop} ({dropPercentage}%)</span>
+                      </div>
+                    )}
+                    {drop < 0 && (
+                      <div className="flex items-center gap-1 text-xs text-emerald-500">
+                        <TrendingUp className="w-3 h-3" />
+                        <span>+{Math.abs(drop)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Gráfico de Barras Detalhado */}
+          <div className="mt-8">
+            <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">Distribuição por Estágio</h4>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart 
+                data={funnelData} 
+                margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="stage" 
+                  tick={{ fontSize: 11, fontWeight: 'bold', fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `Estágio ${value}`}
+                />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(99, 102, 241, 0.05)', radius: 8 }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
+                  formatter={(v: any) => [`${v} leads`, 'Leads']}
+                  labelFormatter={(label) => `Estágio ${label}`}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={50}>
+                  {funnelData.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>
