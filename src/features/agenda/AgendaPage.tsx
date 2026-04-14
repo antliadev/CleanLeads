@@ -1,21 +1,24 @@
 import { Suspense } from 'react';
 import { CalendarDays } from 'lucide-react';
-import { getAgendaLeads } from '@/actions/cadence';
+import { getAgendaLeads, getStageCounts } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
 import { AgendaList } from '@/features/agenda/components/AgendaList';
+import { AgendaStagePanel } from '@/features/agenda/components/AgendaStagePanel';
 
 export default async function AgendaPage() {
   const [
     { leads, totalPending }, 
-    templates
+    templates,
+    { stages, totalActive }
   ] = await Promise.all([
     getAgendaLeads(),
-    getTemplates()
+    getTemplates(),
+    getStageCounts()
   ]);
   
   // Agrupamento para estatísticas rápidas
   const overdueCount = leads.filter((l: any) => l.isOverdue).length;
-  const todayCount = leads.filter((l: any) => !l.isOverdue).length; // Na agenda de 10 prioritários
+  const todayCount = leads.filter((l: any) => !l.isOverdue).length;
 
   const stats = [
     { label: 'Vencidos', value: overdueCount.toString().padStart(2, '0'), color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-950/20', borderColor: 'border-rose-100 dark:border-rose-900/30' },
@@ -42,6 +45,9 @@ export default async function AgendaPage() {
           </div>
         ))}
       </section>
+
+      {/* Painel de Estágios */}
+      <AgendaStagePanel stages={stages} totalActive={totalActive} />
 
       {/* Título e Filtros */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">

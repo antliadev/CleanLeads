@@ -116,14 +116,12 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
               </div>
 
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Atraso</p>
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
-                  <Clock className="w-3.5 h-3.5" />
-                  {lead.delayStr ? (
-                    <span className="text-rose-500">{lead.delayStr}</span>
-                  ) : (
-                    <span className="text-indigo-500">Pronto</span>
-                  )}
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Próxima Ação</p>
+                <div className="flex items-center gap-2 text-sm font-bold">
+                  <Clock className={`w-3.5 h-3.5 ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`} />
+                  <span className={lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}>
+                    {lead.timeDisplay || 'Pronto'}
+                  </span>
                 </div>
               </div>
 

@@ -80,29 +80,99 @@ export async function getAgendaLeads() {
     })
   ]);
 
-  const leads = entries.map((entry: any) => {
+const leads = entries.map((entry: any) => {
     const currentStage = entry.cadence.stages.find((s: any) => s.order === entry.currentStageOrder);
     const isOverdue = entry.nextScheduledAt < now;
     
-    // Cálculo simples de delay para UI
-    let delayStr = null;
+    // Cálculo de tempo para UI (残り時間 ou tempo atrasado)
+    let timeDisplay = null;
+    const diffMs = now.getTime() - new Date(entry.nextScheduledAt).getTime();
+    const diffHours = Math.abs(diffMs) / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const remainingHours = Math.floor(diffHours % 24);
+    const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
     if (isOverdue) {
-      const diffMs = now.getTime() - entry.nextScheduledAt.getTime();
-      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      delayStr = diffHrs > 0 ? `${diffHrs}h ${diffMins}m` : `${diffMins}m`;
+      // Atrasado - mostrar tempo passado
+      if (diffDays > 0) {
+        timeDisplay = `${diffDays}d ${remainingHours}h atrasado`;
+      } else if (remainingHours > 0) {
+        timeDisplay = `${remainingHours}h ${remainingMins}m atrasado`;
+      } else {
+        timeDisplay = `${remainingMins}m atrasado`;
+      }
+    } else {
+      // No prazo - mostrar tempo restante
+      if (diffDays > 0) {
+        timeDisplay = `${diffDays}d ${remainingHours}h`;
+      } else if (remainingHours > 0) {
+        timeDisplay = `${remainingHours}h ${remainingMins}m`;
+      } else {
+        timeDisplay = `${remainingMins}m`;
+      }
     }
 
     return {
       ...entry,
       currentStage,
       isOverdue,
-      delayStr,
-      isExtremeUrgent: isOverdue && (now.getTime() - entry.nextScheduledAt.getTime() > 4 * 60 * 60 * 1000) // +4h de atraso
+      timeDisplay,
+      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000)
     };
   });
 
-  return { leads, totalPending };
+return { leads, totalPending };
+}
+
+/**
+ * BUSCA CONTAGEM DE LEADS POR ESTÁGIO
+ * Usado pelo painel de estágios na agenda e gráfico do dashboard
+ */
+export async function getStageCounts() {
+  const profile = await getAuthProfile();
+  if (!profile) throw new Error('Não autorizado');
+
+  // Garante cadência padrão
+  await ensureDefaultCadence(profile.id);
+
+  // Busca a cadência do perfil para saber quantos estágios existem
+  const cadence = await prisma.cadenceEngine.findFirst({
+    where: { profileId: profile.id },
+    include: { stages: { orderBy: { order: 'asc' } } }
+  });
+
+  if (!cadence || cadence.stages.length === 0) {
+    return { stages: [], totalActive: 0 };
+  }
+
+  const stageCount = cadence.stages.length;
+
+  // Conta leads por estágio (mesma lógica do analytics)
+  const stageStats = await prisma.leadCadenceProgress.groupBy({
+    by: ['currentStageOrder'],
+    where: {
+      profileId: profile.id,
+      status: 'ACTIVE',
+    },
+    _count: { currentStageOrder: true },
+  });
+
+  // Cria array com todos os estágios,填补 faltantes com 0
+  const stages = Array.from({ length: stageCount }, (_, i) => {
+    const order = i + 1;
+    const stat = stageStats.find((s: any) => s.currentStageOrder === order);
+    const stage = cadence.stages.find((s: any) => s.order === order);
+    return {
+      order,
+      count: stat?._count?.currentStageOrder ?? 0,
+      channel: stage?.channel ?? 'UNKNOWN',
+      delayDays: stage?.delayDays ?? 0,
+    };
+  });
+
+  const totalActive = stageStats.reduce((acc: number, s: any) => acc + (s._count?.currentStageOrder ?? 0), 0);
+
+  return { stages, totalActive };
 }
 
 /**
@@ -141,20 +211,38 @@ export async function getAgendaLeadsMore(skip: number) {
     const currentStage = entry.cadence.stages.find((s: any) => s.order === entry.currentStageOrder);
     const isOverdue = entry.nextScheduledAt < now;
     
-    let delayStr = null;
+    // Cálculo de tempo para UI (残り時間 ou tempo atrasado)
+    let timeDisplay = null;
+    const diffMs = now.getTime() - new Date(entry.nextScheduledAt).getTime();
+    const diffHours = Math.abs(diffMs) / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const remainingHours = Math.floor(diffHours % 24);
+    const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
     if (isOverdue) {
-      const diffMs = now.getTime() - entry.nextScheduledAt.getTime();
-      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      delayStr = diffHrs > 0 ? `${diffHrs}h ${diffMins}m` : `${diffMins}m`;
+      if (diffDays > 0) {
+        timeDisplay = `${diffDays}d ${remainingHours}h atrasado`;
+      } else if (remainingHours > 0) {
+        timeDisplay = `${remainingHours}h ${remainingMins}m atrasado`;
+      } else {
+        timeDisplay = `${remainingMins}m atrasado`;
+      }
+    } else {
+      if (diffDays > 0) {
+        timeDisplay = `${diffDays}d ${remainingHours}h`;
+      } else if (remainingHours > 0) {
+        timeDisplay = `${remainingHours}h ${remainingMins}m`;
+      } else {
+        timeDisplay = `${remainingMins}m`;
+      }
     }
 
     return {
       ...entry,
       currentStage,
       isOverdue,
-      delayStr,
-      isExtremeUrgent: isOverdue && (now.getTime() - entry.nextScheduledAt.getTime() > 4 * 60 * 60 * 1000)
+      timeDisplay,
+      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000)
     };
   });
 
