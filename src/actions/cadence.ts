@@ -616,13 +616,25 @@ export async function startLeadCadenceBulk(leadIds: string[]) {
  * Move múltiplos leads para um estágio específico da cadência
  */
 export async function bulkUpdateLeadStage(leadIds: string[], targetStage: number, operatorId: string) {
+  console.log('[bulkUpdateLeadStage] Recebido:', { leadIds, targetStage, operatorId });
+  
   // Validar entrada
   const parsedStage = Number(targetStage);
+  console.log('[bulkUpdateLeadStage] parsedStage:', parsedStage, 'isNaN:', isNaN(parsedStage));
+  
   if (isNaN(parsedStage) || parsedStage < 1) {
     throw new Error('Estágio inválido. Selecione um estágio válido.');
   }
 
-  const profile = await getAuthProfile();
+  let profile;
+  try {
+    profile = await getAuthProfile();
+    console.log('[bulkUpdateLeadStage] profile:', profile?.id);
+  } catch (e: any) {
+    console.error('[bulkUpdateLeadStage] Erro getAuthProfile:', e.message);
+    throw e;
+  }
+  
   if (!profile) throw new Error('Não autorizado');
   if (!leadIds || leadIds.length === 0) throw new Error('Nenhum lead selecionado');
 
@@ -636,11 +648,15 @@ export async function bulkUpdateLeadStage(leadIds: string[], targetStage: number
     include: { stages: { orderBy: { order: 'asc' } } }
   });
 
+  console.log('[bulkUpdateLeadStage] cadence:', cadence?.id, 'stages:', cadence?.stages?.length);
+
   if (!cadence || cadence.stages.length === 0) {
     throw new Error('CONFIG_ERROR: Nenhuma cadência configurada.');
   }
 
   const targetStageData = cadence.stages.find((s: any) => s.order === targetStage);
+  console.log('[bulkUpdateLeadStage] targetStageData:', targetStageData);
+  
   if (!targetStageData) {
     throw new Error(`Estágio ${targetStage} não existe na cadência.`);
   }
