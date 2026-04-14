@@ -13,6 +13,7 @@ import { LeadNotesHistoryModal } from './LeadNotesHistoryModal';
 import { LEAD_SOURCE_MAP } from '@/lib/constants';
 import { startLeadCadenceBulk } from '@/actions/cadence';
 import { toast } from 'sonner';
+import { useOperator } from '@/components/providers/OperatorProvider';
 import type { Template, TemplateChannel } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import type { LeadWithHistory } from './types';
@@ -42,6 +43,9 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkStarting, setIsBulkStarting] = useState(false);
+  const [selectedStageForBulk, setSelectedStageForBulk] = useState<string>('');
+  const [isBulkUpdatingStage, setIsBulkUpdatingStage] = useState(false);
+  const { activeOperator } = useOperator();
 
   async function handleDelete(id: string) {
     await deleteLead(id);
@@ -54,6 +58,24 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
+  async function handleBulkUpdateStage() {
+    if (!selectedStageForBulk || !activeOperator) return;
+    
+    setIsBulkUpdatingStage(true);
+    try {
+      const { bulkUpdateLeadStage } = await import('@/actions/cadence');
+      await bulkUpdateLeadStage(selectedIds, parseInt(selectedStageForBulk), activeOperator.id);
+      toast.success(`${selectedIds.length} leads movidos para o estágio ${selectedStageForBulk}.`);
+      setSelectedIds([]);
+      setSelectedStageForBulk('');
+      router.refresh();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setIsBulkUpdatingStage(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Barra de ações */}
@@ -63,26 +85,66 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
         </p>
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
-            <button
-              onClick={async () => {
-                setIsBulkStarting(true);
-                try {
-                  await startLeadCadenceBulk(selectedIds);
-                  toast.success(`${selectedIds.length} leads enviados para cadência.`);
-                  setSelectedIds([]);
-                  router.refresh();
-                } catch (e: any) {
-                  toast.error(e.message);
-                } finally {
-                  setIsBulkStarting(false);
-                }
-              }}
-              disabled={isBulkStarting}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-            >
-              {isBulkStarting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              Iniciar Cadência ({selectedIds.length})
-            </button>
+            <>
+              {/* Botão Alterar Estágio */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (!selectedStageForBulk) {
+                      toast.error('Selecione um estágio primeiro');
+                      return;
+                    }
+                    if (!activeOperator) {
+                      toast.error('Selecione um operador');
+                      return;
+                    }
+                    // Confirmar e executar
+                    handleBulkUpdateStage();
+                  }}
+                  disabled={isBulkUpdatingStage}
+                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                >
+                  {isBulkUpdatingStage ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Alterar Estágio ({selectedIds.length})
+                </button>
+                <select
+                  value={selectedStageForBulk}
+                  onChange={(e) => setSelectedStageForBulk(e.target.value)}
+                  className="absolute right-0 top-0 h-full opacity-0 cursor-pointer"
+                  style={{ width: '140px' }}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="1">Estágio 1</option>
+                  <option value="2">Estágio 2</option>
+                  <option value="3">Estágio 3</option>
+                  <option value="4">Estágio 4</option>
+                  <option value="5">Estágio 5</option>
+                  <option value="6">Estágio 6</option>
+                </select>
+              </div>
+
+              {/* Botão Iniciar Cadência */}
+              <button
+                onClick={async () => {
+                  setIsBulkStarting(true);
+                  try {
+                    await startLeadCadenceBulk(selectedIds);
+                    toast.success(`${selectedIds.length} leads enviados para cadência.`);
+                    setSelectedIds([]);
+                    router.refresh();
+                  } catch (e: any) {
+                    toast.error(e.message);
+                  } finally {
+                    setIsBulkStarting(false);
+                  }
+                }}
+                disabled={isBulkStarting}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              >
+                {isBulkStarting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Iniciar Cadência ({selectedIds.length})
+              </button>
+            </>
           )}
 
           <button

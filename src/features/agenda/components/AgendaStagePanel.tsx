@@ -11,6 +11,8 @@ interface StagePanelProps {
     delayDays: number;
   }[];
   totalActive: number;
+  selectedStage?: number | null;
+  onStageClick?: (stageOrder: number) => void;
 }
 
 const CHANNEL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -25,7 +27,7 @@ const CHANNEL_COLORS: Record<string, string> = {
   WHATSAPP: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400',
 };
 
-export function AgendaStagePanel({ stages, totalActive }: StagePanelProps) {
+export function AgendaStagePanel({ stages, totalActive, selectedStage, onStageClick }: StagePanelProps) {
   if (stages.length === 0) {
     return null;
   }
@@ -43,11 +45,19 @@ export function AgendaStagePanel({ stages, totalActive }: StagePanelProps) {
         {stages.map((stage) => {
           const IconComponent = CHANNEL_ICONS[stage.channel] || Mail;
           const colorClass = CHANNEL_COLORS[stage.channel] || 'bg-slate-50 text-slate-600';
+          const isSelected = selectedStage === stage.order;
           
           return (
-            <div
+            <button
               key={stage.order}
-              className="flex-shrink-0 flex flex-col items-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 min-w-[100px]"
+              onClick={() => onStageClick?.(stage.order)}
+              className={`
+                flex-shrink-0 flex flex-col items-center gap-2 px-4 py-3 rounded-xl border min-w-[100px] transition-all
+                ${isSelected 
+                  ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 dark:border-indigo-500 shadow-lg shadow-indigo-500/20' 
+                  : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md cursor-pointer'
+                }
+              `}
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorClass}`}>
                 <IconComponent className="w-5 h-5" />
@@ -61,7 +71,7 @@ export function AgendaStagePanel({ stages, totalActive }: StagePanelProps) {
                   {stage.delayDays === 0 ? 'Imediato' : `${stage.delayDays}d`}
                 </span>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -18,14 +18,24 @@ interface AgendaListProps {
   initialLeads: any[];
   totalPending: number;
   templates: any[];
+  isLoading?: boolean;
+  stageFilter?: number | null;
 }
 
-export function AgendaList({ initialLeads, totalPending, templates }: AgendaListProps) {
+export function AgendaList({ initialLeads, totalPending, templates, isLoading, stageFilter }: AgendaListProps) {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [displayedLeads, setDisplayedLeads] = useState(initialLeads);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(totalPending > initialLeads.length);
+
+  // Atualiza displayedLeads quando initialLeads mudar (por causa do filtro)
+  const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
+  if (initialLeads !== prevInitialLeads) {
+    setDisplayedLeads(initialLeads);
+    setPrevInitialLeads(initialLeads);
+    setHasMore(totalPending > initialLeads.length);
+  }
 
   const handleOpenAction = (lead: any) => {
     setSelectedLead(lead);
@@ -38,6 +48,7 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
     setIsLoadingMore(true);
     try {
       const { getAgendaLeadsMore } = await import('@/actions/cadence');
+      // Pegar o stageFilter do componente pai via prop ou contexto
       const result = await getAgendaLeadsMore(displayedLeads.length);
       
       if (result.leads && result.leads.length > 0) {
@@ -51,6 +62,17 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
     } finally {
       setIsLoadingMore(false);
     }
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl" />
+        ))}
+      </div>
+    );
   }
 
   if (displayedLeads.length === 0) {
