@@ -49,7 +49,11 @@ export async function getAgendaLeads() {
 
   const now = new Date();
 
-  // 1. Busca total de leads ativos e pendentes para sinalização de fila e os 10 prioritários
+  // Nova ordenação: leads mais quentes/prioritários primeiro
+  // 1. Atrasados (ordenados por quem está mais tempo atrasado)
+  // 2. Prontos para ação (scheduling <= now, ordenados por estágio mais baixo)
+  // 3. Próximos (scheduling futuro próximo)
+  // 4. Estágios avançados sem ação urgente
   const [entries, totalPending] = await Promise.all([
     prisma.leadCadenceProgress.findMany({
       where: {
@@ -59,8 +63,13 @@ export async function getAgendaLeads() {
       },
       take: 10,
       orderBy: [
-        { nextScheduledAt: 'asc' }, // Mais atrasados primeiro
-        { version: 'asc' } // Desempate determinístico
+        // Prioridade 1: Atrasados (nextScheduledAt < now) - mais atrasados primeiro
+        { nextScheduledAt: 'asc' },
+        // Prioridade 2: Prontos (nextScheduledAt <= now)
+        // Prioridade 3: Estágio mais baixo = mais prioridade
+        { currentStageOrder: 'asc' },
+        // Desempate determinístico
+        { version: 'asc' }
       ],
       include: {
         lead: true,
@@ -195,6 +204,7 @@ export async function getAgendaLeadsMore(skip: number) {
     take,
     orderBy: [
       { nextScheduledAt: 'asc' },
+      { currentStageOrder: 'asc' },
       { version: 'asc' }
     ],
     include: {
@@ -355,6 +365,7 @@ export async function advanceCadenceStage(props: {
     });
 
     revalidatePath('/');
+    revalidatePath('/agenda');
     return updated;
   });
 }
@@ -424,6 +435,12 @@ export async function resumeLeadCadence(progressId: string, operatorId: string) 
       }
     });
 
+    // Atualiza o status do lead de volta para ativo
+    await tx.lead.update({
+      where: { id: progress.leadId },
+      data: { status: 'AGUARDANDO_RETORNO' }
+    });
+
     await tx.leadCadenceEvent.create({
       data: {
         leadCadenceProgressId: progressId,
@@ -433,7 +450,16 @@ export async function resumeLeadCadence(progressId: string, operatorId: string) 
       }
     });
 
+    await tx.leadNote.create({
+      data: {
+        leadId: progress.leadId,
+        operatorId,
+        content: `[SISTEMA] Cadência retomada - Status alterado para AGUARDANDO_RETORNO`
+      }
+    });
+
     revalidatePath('/agenda');
+    revalidatePath('/leads');
     return progress;
   });
 }
