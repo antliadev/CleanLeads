@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,17 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Trava scroll da página quando modal abre
+  useEffect(() => {
+    if (open) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [open]);
 
   async function handleConfirm() {
     setLoading(true);

@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { CalendarDays, AlertCircle } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 import { getAgendaLeads } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
 import { AgendaList } from '@/features/agenda/components/AgendaList';
@@ -24,13 +24,13 @@ export default async function AgendaPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 space-y-10">
+    <div className="max-w-6xl mx-auto py-6 px-4 space-y-6">
       {/* Cabeçalho de Estatísticas */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat) => (
           <div
             key={stat.label}
-            className={`p-6 rounded-[2rem] border shadow-sm transition-all hover:shadow-md ${stat.bg} ${stat.borderColor}`}
+            className={`p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md ${stat.bg} ${stat.borderColor}`}
           >
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">{stat.label}</p>
             <div className="flex items-end justify-between">
@@ -44,9 +44,9 @@ export default async function AgendaPage() {
       </section>
 
       {/* Título e Filtros */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Agenda Operacional</h1>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Agenda Operacional</h1>
           <p className="text-slate-500 font-medium tracking-tight">Os 10 leads mais prioritários para seu follow-up hoje.</p>
         </div>
       </div>
@@ -55,7 +55,7 @@ export default async function AgendaPage() {
       <Suspense fallback={
         <div className="space-y-4 animate-pulse">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-[2.5rem]" />
+            <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl" />
           ))}
         </div>
       }>

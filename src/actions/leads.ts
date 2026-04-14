@@ -206,6 +206,7 @@ export async function updateLead(
     if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
     const { operatorId, notes, customSource, ...otherData } = parsed.data;
+    const cadenceStageOrder = raw.cadenceStageOrder as string | undefined;
 
     const data: any = Object.fromEntries(
       Object.entries(otherData).filter(([, v]) => v !== '' && v !== undefined)
@@ -241,9 +242,108 @@ export async function updateLead(
           }
         });
       }
+
+      // 处理 Cadência Stage - iniciar ou reposicionar
+      if (cadenceStageOrder && cadenceStageOrder !== '') {
+        const stageOrder = parseInt(cadenceStageOrder);
+        
+        // Busca a cadência ativa do perfil
+        const cadence = await tx.cadenceEngine.findFirst({
+          where: {
+            OR: [
+              { profileId: profile.id, isActive: true },
+              { profileId: null, isActive: true }
+            ]
+          },
+          include: { stages: { orderBy: { order: 'asc' } } }
+        });
+
+        if (cadence && cadence.stages.length > 0) {
+          const stage = cadence.stages.find((s: any) => s.order === stageOrder);
+          if (stage) {
+            // Calcula o próximo agendamento baseado no delay do estágio
+            const now = new Date();
+            const delay = stage.delayDays || 0;
+            const nextScheduledAt = new Date(now.getTime() + delay * 24 * 60 * 60 * 1000);
+
+            // Verifica se já existe um progresso de cadência
+            const existingProgress = await tx.leadCadenceProgress.findUnique({
+              where: { leadId: id }
+            });
+
+            if (existingProgress) {
+              // Atualiza o estágio existente
+              await tx.leadCadenceProgress.update({
+                where: { id: existingProgress.id },
+                data: {
+                  currentStageOrder: stageOrder,
+                  status: 'ACTIVE',
+                  nextScheduledAt,
+                  pausedAt: null,
+                  finishedAt: null,
+                  version: { increment: 1 }
+                }
+              });
+              
+              await tx.leadCadenceEvent.create({
+                data: {
+                  leadCadenceProgressId: existingProgress.id,
+                  leadId: id,
+                  action: 'MANUAL_REPOSITION',
+                  fromStage: existingProgress.currentStageOrder,
+                  toStage: stageOrder,
+                  operatorId,
+                  notes: `Reposicionado manualmente para o estágio ${stageOrder} via edição do lead.`
+                }
+              });
+
+              await tx.leadNote.create({
+                data: {
+                  leadId: id,
+                  operatorId,
+                  content: `[SISTEMA] Lead reposicionado para o estágio ${stageOrder} da cadência "${cadence.name}".`
+                }
+              });
+            } else {
+              // Cria novo progresso de cadência a partir do estágio selecionado
+              const progress = await tx.leadCadenceProgress.create({
+                data: {
+                  profileId: profile.id,
+                  leadId: id,
+                  cadenceId: cadence.id,
+                  currentStageOrder: stageOrder,
+                  status: 'ACTIVE',
+                  nextScheduledAt,
+                  lastActionAt: now
+                }
+              });
+
+              await tx.leadCadenceEvent.create({
+                data: {
+                  leadCadenceProgressId: progress.id,
+                  leadId: id,
+                  action: 'START',
+                  toStage: stageOrder,
+                  operatorId,
+                  notes: `Cadência iniciada manualmente no estágio ${stageOrder}: ${cadence.name}`
+                }
+              });
+
+              await tx.leadNote.create({
+                data: {
+                  leadId: id,
+                  operatorId,
+                  content: `[SISTEMA] Lead iniciado na cadência "${cadence.name}" no estágio ${stageOrder}.`
+                }
+              });
+            }
+          }
+        }
+      }
     });
 
     revalidatePath('/leads');
+    revalidatePath('/agenda');
     revalidatePath(`/leads/${id}`);
     return { success: true };
   } catch (err: any) {

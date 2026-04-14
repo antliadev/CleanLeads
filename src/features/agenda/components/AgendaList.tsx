@@ -4,11 +4,10 @@ import { useState } from 'react';
 import { 
   Clock, 
   AlertCircle, 
-  ChevronRight,
   Mail,
-  MoreVertical,
   PauseCircle,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -24,20 +23,44 @@ interface AgendaListProps {
 export function AgendaList({ initialLeads, totalPending, templates }: AgendaListProps) {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [displayedLeads, setDisplayedLeads] = useState(initialLeads);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(totalPending > initialLeads.length);
 
   const handleOpenAction = (lead: any) => {
     setSelectedLead(lead);
     setIsDrawerOpen(true);
   };
 
-  if (initialLeads.length === 0) {
+  async function loadMoreLeads() {
+    if (isLoadingMore || !hasMore) return;
+    
+    setIsLoadingMore(true);
+    try {
+      const { getAgendaLeadsMore } = await import('@/actions/cadence');
+      const result = await getAgendaLeadsMore(displayedLeads.length);
+      
+      if (result.leads && result.leads.length > 0) {
+        setDisplayedLeads(prev => [...prev, ...result.leads]);
+        setHasMore(displayedLeads.length + result.leads.length < totalPending);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mais leads da agenda:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  if (displayedLeads.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-12 text-center space-y-4">
-        <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto">
+      <div className="bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl p-12 text-center space-y-4">
+        <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center mx-auto">
           <Clock className="w-8 h-8 text-slate-300" />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 italic">"Agenda Vazia"</h3>
+          <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 italic">Agenda Vazia</h3>
           <p className="text-slate-500 font-medium">Tudo em dia! Sem leads para follow-up agora.</p>
         </div>
       </div>
@@ -46,7 +69,7 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
 
   return (
     <div className="space-y-4">
-      {initialLeads.map((lead, idx) => (
+      {displayedLeads.map((lead, idx) => (
         <motion.div
           key={lead.id}
           initial={{ opacity: 0, x: -20 }}
@@ -54,7 +77,7 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
           transition={{ delay: idx * 0.05 }}
           onClick={() => handleOpenAction(lead)}
           className={cn(
-            "group relative bg-white dark:bg-slate-900 border p-6 rounded-[2.5rem] transition-all hover:shadow-2xl hover:-translate-y-1 cursor-pointer overflow-hidden",
+            "group relative bg-white dark:bg-slate-900 border p-6 rounded-2xl transition-all hover:shadow-xl hover:-translate-y-0.5 cursor-pointer overflow-hidden",
             lead.isExtremeUrgent 
               ? "border-rose-100 dark:border-rose-900/30" 
               : "border-slate-100 dark:border-slate-800"
@@ -106,12 +129,12 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
 
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={(e) => { e.stopPropagation(); /* TODO: Pause logic */ }}
+                  onClick={(e) => { e.stopPropagation(); }}
                   className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all"
                 >
                   <PauseCircle className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-2 bg-indigo-600 text-white pl-6 pr-4 py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 dark:shadow-none active:scale-95 group/btn">
+                <div className="flex items-center gap-2 bg-indigo-600 text-white pl-6 pr-4 py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none active:scale-95 group/btn">
                   Executar
                   <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
                 </div>
@@ -121,23 +144,47 @@ export function AgendaList({ initialLeads, totalPending, templates }: AgendaList
         </motion.div>
       ))}
       
-      {totalPending > initialLeads.length && (
+      {/* Botão Mostrar Mais */}
+      {hasMore && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-indigo-50 dark:bg-indigo-950/20 border-2 border-dashed border-indigo-200 dark:border-indigo-800/50 rounded-[2.5rem] p-8 text-center"
+          className="flex justify-center py-4"
         >
-          <p className="text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center gap-2">
-            <Clock className="w-5 h-5" />
-            + {totalPending - initialLeads.length} leads aguardando na fila de hoje
-          </p>
-          <p className="text-indigo-400 dark:text-indigo-500 text-xs font-medium mt-1">
-            Execute os leads acima para liberar os próximos da fila.
+          <button
+            onClick={loadMoreLeads}
+            disabled={isLoadingMore}
+            className="flex items-center gap-2 px-8 py-3 bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold rounded-2xl hover:border-indigo-500 hover:text-indigo-600 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-all disabled:opacity-50"
+          >
+            {isLoadingMore ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Carregando...
+              </>
+            ) : (
+              <>
+                <Clock className="w-5 h-5" />
+                Mostrar mais ({totalPending - displayedLeads.length} restantes)
+              </>
+            )}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Mensagem quando não há mais */}
+      {!hasMore && totalPending > displayedLeads.length && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-6 text-center"
+        >
+          <p className="text-indigo-600 dark:text-indigo-400 font-medium">
+            Todos os {totalPending} leads da agenda foram exibidos.
           </p>
         </motion.div>
       )}
 
-      {/* Modal Lateral (Real) */}
+      {/* Modal Lateral */}
       <LeadActionDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => setIsDrawerOpen(false)} 

@@ -84,6 +84,11 @@ export const IMPORT_MAX_ROWS = 2000;
 export const IMPORT_CHUNK_SIZE = 500;
 
 /**
- * Itens por página padrão na listagem.
+ * Itens por página padrão na listagem de leads.
  */
-export const DEFAULT_PAGE_SIZE = 15;
+export const DEFAULT_PAGE_SIZE = 50;
+
+/**
+ * Itens por página padrão na agenda.
+ */
+export const AGENDA_PAGE_SIZE = 10;

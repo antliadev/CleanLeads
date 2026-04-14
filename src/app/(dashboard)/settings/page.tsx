@@ -23,7 +23,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50 dark:bg-slate-950">
-      <div className="flex-1 flex flex-col p-8 overflow-auto">
+      <div className="flex-1 flex flex-col p-6 overflow-auto">
         <div className="max-w-4xl mx-auto w-full space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Configurações</h1>

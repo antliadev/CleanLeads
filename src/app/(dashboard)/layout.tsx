@@ -35,7 +35,7 @@ export default async function DashboardLayout({
         <Sidebar />
         <div className="flex-1 ml-64">
           <Header userName={user.user_metadata?.name || user.email || 'Usuário'} />
-          <main className="p-8 pt-24">
+          <main className="p-4 md:p-6 pt-24">
             {children}
           </main>
         </div>

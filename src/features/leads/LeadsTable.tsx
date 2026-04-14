@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight, MessageSquare, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
 
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -24,9 +24,12 @@ interface LeadsTableProps {
   totalPages: number;
   templates: Template[];
   onPageChange: (page: number) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 }
 
-export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange, hasMore, onLoadMore, isLoadingMore }: LeadsTableProps) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadWithHistory | null>(null);
@@ -119,7 +122,7 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
 
       {/* Tabela */}
       {leads.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-20 text-center transition-colors">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center py-20 text-center transition-colors">
           <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex items-center justify-center mb-4 transition-colors">
             <Plus className="w-8 h-8 text-slate-300 dark:text-slate-600" />
           </div>
@@ -133,7 +136,7 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
           </button>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors shadow-sm">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors shadow-sm">
           <div className="overflow-x-auto overflow-y-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -397,28 +400,51 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
             </table>
           </div>
 
-          {/* Paginação */}
-          {totalPages > 1 && (
+          {/* Paginação ou Botão Mostrar Mais */}
+          {(hasMore || totalPages > 1) && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 transition-colors bg-slate-50/30 dark:bg-slate-950/30">
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                Página <span className="text-slate-900 dark:text-slate-100">{page}</span> de <span className="text-slate-900 dark:text-slate-100">{totalPages}</span>
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onPageChange(page - 1)}
-                  disabled={page <= 1}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onPageChange(page + 1)}
-                  disabled={page >= totalPages}
-                  className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              {hasMore ? (
+                <div className="flex-1 flex justify-center">
+                  <button
+                    onClick={onLoadMore}
+                    disabled={isLoadingMore}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all disabled:opacity-50"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Carregando...
+                      </>
+                    ) : (
+                      <>
+                        Mostrar mais ({total - leads.length} restantes)
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : totalPages > 1 ? (
+                <>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                    Página <span className="text-slate-900 dark:text-slate-100">{page}</span> de <span className="text-slate-900 dark:text-slate-100">{totalPages}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onPageChange(page - 1)}
+                      disabled={page <= 1}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onPageChange(page + 1)}
+                      disabled={page >= totalPages}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
           )}
         </div>

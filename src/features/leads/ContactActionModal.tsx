@@ -39,6 +39,17 @@ export function ContactActionModal({
   const [note, setNote] = useState('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  // Trava scroll da página quando modal abre
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
+
   // Filtra apenas templates ativos para o canal atual
   const activeTemplates = templates.filter(
     (t) => t.isActive && t.channel === channel

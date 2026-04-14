@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { createLead, updateLead, type LeadFormResult } from '@/actions/leads';
+import { getCadenceSettings } from '@/actions/cadence';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
-import type { Prisma } from '@prisma/client';
 import { useOperator } from '@/components/providers/OperatorProvider';
 import type { LeadWithHistory } from './types';
 
@@ -16,6 +16,33 @@ interface LeadFormProps {
 export function LeadForm({ lead, onClose }: LeadFormProps) {
   const { activeOperator } = useOperator();
   const isEdit = !!lead;
+  const [cadenceStages, setCadenceStages] = useState<{order: number; channel: string; templateName?: string}[]>([]);
+  const [selectedStageOrder, setSelectedStageOrder] = useState<string>('');
+
+  // Trava scroll da página quando modal abre
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalStyle;
+    };
+  }, []);
+
+  // Buscar estágios da cadência quando editing
+  useEffect(() => {
+    if (isEdit) {
+      getCadenceSettings().then((cadence) => {
+        if (cadence && cadence.stages) {
+          setCadenceStages(cadence.stages);
+          // Se o lead já está em cadência, pré-selecionar o estágio atual
+          const currentStage = (lead as any)?.cadenceEngine?.currentStageOrder;
+          if (currentStage) {
+            setSelectedStageOrder(String(currentStage));
+          }
+        }
+      });
+    }
+  }, [isEdit, lead]);
 
   const action = isEdit
     ? updateLead.bind(null, lead.id)
@@ -145,6 +172,30 @@ export function LeadForm({ lead, onClose }: LeadFormProps) {
                 >
                   {Object.entries(LEAD_STATUS_MAP).map(([value, { label }]) => (
                     <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Estágio da Cadência (só em edição) */}
+            {isEdit && cadenceStages.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Estágio da Cadência
+                  <span className="text-xs font-normal text-slate-400 ml-2">(inicie ou reposicione o lead)</span>
+                </label>
+                <input type="hidden" name="cadenceStageOrder" value={selectedStageOrder} />
+                <select
+                  value={selectedStageOrder}
+                  onChange={(e) => setSelectedStageOrder(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-colors"
+                >
+                  <option value="">-- Sem cadência --</option>
+                  {cadenceStages.map((stage) => (
+                    <option key={stage.order} value={stage.order}>
+                      Estágio {stage.order} - {stage.channel === 'LINKEDIN' ? 'LinkedIn' : stage.channel === 'EMAIL' ? 'E-mail' : 'WhatsApp'}
+                      {stage.templateName ? ` (${stage.templateName})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -3,20 +3,15 @@
 import { 
   X, 
   Lock,
-  UserCheck,
-  ArrowRight, 
-  Mail, 
-  MessageCircle, 
   Send, 
   ChevronRight, 
   Pause, 
   Play,
   XCircle,
   Copy,
-  ExternalLink,
   Check,
   ChevronDown,
-  Layout
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, getLinkedinProfileUrl, getGmailComposeUrl, getWhatsAppUrl } from '@/lib/utils';
@@ -24,11 +19,10 @@ import { interpolateTemplate, getMissingFields } from '@/lib/templates';
 import { useState, useEffect } from 'react';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { useOperator } from '@/components/providers/OperatorProvider';
-import { advanceCadenceStage, pauseLeadCadence, resumeLeadCadence, lockLead, unlockLead } from '@/actions/cadence';
+import { advanceCadenceStage, pauseLeadCadence, resumeLeadCadence, lockLead } from '@/actions/cadence';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle } from 'lucide-react';
 
 interface LeadActionDrawerProps {
   isOpen: boolean;
@@ -44,6 +38,17 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [compiledText, setCompiledText] = useState('');
   const { activeOperator } = useOperator();
+
+  // Trava scroll da página quando drawer abre
+  useEffect(() => {
+    if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalStyle;
+      };
+    }
+  }, [isOpen]);
 
   // Trava o lead ao abrir para evitar conflitos (Smart Locking)
   useEffect(() => {
@@ -259,36 +264,46 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                          </div>
                        )}
 
-                       <button 
-                         onClick={() => {
-                           if (!selectedTemplate) return toast.error('Selecione um template primeiro');
-                           
-                           // Usa o texto que está na área de preview (permite edições de última hora)
-                           navigator.clipboard.writeText(compiledText);
-                           toast.success('Abordagem copiada para transferência!');
-                           
-                           // Redirecionamento Baseado no Canal
-                           const lead = leadProgress.lead;
-                           let url: string | null = null;
-                           
-                           if (currentStage?.channel === 'LINKEDIN') {
-                             url = getLinkedinProfileUrl(lead.linkedinUrl);
-                           } else if (currentStage?.channel === 'EMAIL') {
-                             url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, compiledText);
-                           } else if (currentStage?.channel === 'WHATSAPP') {
-                             url = getWhatsAppUrl(lead.phone, compiledText);
-                           }
+<button 
+                          onClick={async () => {
+                            if (!selectedTemplate) return toast.error('Selecione um template primeiro');
+                            
+                            // Copiar o texto primeiro
+                            try {
+                              await navigator.clipboard.writeText(compiledText);
+                              toast.success('Abordagem copiada!');
+                            } catch (err) {
+                              console.error('Erro ao copiar:', err);
+                              toast.error('Erro ao copiar. Tente novamente.');
+                              return;
+                            }
+                            
+                            // Redirecionamento Baseado no Canal
+                            const lead = leadProgress.lead;
+                            let url: string | null = null;
+                            
+                            if (currentStage?.channel === 'LINKEDIN') {
+                              url = getLinkedinProfileUrl(lead.linkedinUrl);
+                            } else if (currentStage?.channel === 'EMAIL') {
+                              url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, compiledText);
+                            } else if (currentStage?.channel === 'WHATSAPP') {
+                              url = getWhatsAppUrl(lead.phone, compiledText);
+                            }
 
-                           if (url) {
-                             setTimeout(() => {
-                               window.open(url!, '_blank');
-                             }, 100);
-                           }
-                         }}
-                         className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100 dark:shadow-none"
-                       >
-                          <Copy className="w-4 h-4" /> Copiar & Abrir Canal
-                       </button>
+                            if (url) {
+                              // Abre a URL em nova aba
+                              const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                              if (!newWindow) {
+                                toast.error('Popup bloqueado. Permita popups para esta página.');
+                              }
+                            } else {
+                              toast.error('URL não disponível para este lead.');
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100 dark:shadow-none"
+                        >
+                           <Copy className="w-4 h-4" /> Copiar & Abrir Canal
+                        </button>
                     </div>
                   </div>
                 </div>

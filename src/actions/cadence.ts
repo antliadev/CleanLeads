@@ -106,6 +106,62 @@ export async function getAgendaLeads() {
 }
 
 /**
+ * BUSCA MAIS LEADS DA AGENDA: Retorna os próximos leads após o índice fornecido
+ */
+export async function getAgendaLeadsMore(skip: number) {
+  const profile = await getAuthProfile();
+  if (!profile) throw new Error('Não autorizado');
+
+  const now = new Date();
+  const take = 10;
+
+  const entries = await prisma.leadCadenceProgress.findMany({
+    where: {
+      profileId: profile.id,
+      status: 'ACTIVE',
+      finishedAt: null,
+    },
+    skip,
+    take,
+    orderBy: [
+      { nextScheduledAt: 'asc' },
+      { version: 'asc' }
+    ],
+    include: {
+      lead: true,
+      cadence: {
+        include: {
+          stages: true
+        }
+      }
+    }
+  });
+
+  const leads = entries.map((entry: any) => {
+    const currentStage = entry.cadence.stages.find((s: any) => s.order === entry.currentStageOrder);
+    const isOverdue = entry.nextScheduledAt < now;
+    
+    let delayStr = null;
+    if (isOverdue) {
+      const diffMs = now.getTime() - entry.nextScheduledAt.getTime();
+      const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      delayStr = diffHrs > 0 ? `${diffHrs}h ${diffMins}m` : `${diffMins}m`;
+    }
+
+    return {
+      ...entry,
+      currentStage,
+      isOverdue,
+      delayStr,
+      isExtremeUrgent: isOverdue && (now.getTime() - entry.nextScheduledAt.getTime() > 4 * 60 * 60 * 1000)
+    };
+  });
+
+  return { leads };
+}
+
+/**
  * EXECUTA ESTÁGIO: Avança o lead na cadência
  */
 export async function advanceCadenceStage(props: {
@@ -449,15 +505,20 @@ export async function startLeadCadenceBulk(leadIds: string[]) {
  * BUSCA CONFIGURAÇÕES DA CADÊNCIA
  */
 export async function getCadenceSettings() {
-  const profile = await getAuthProfile();
-  if (!profile) throw new Error('Não autorizado');
+  try {
+    const profile = await getAuthProfile();
+    if (!profile) return null;
 
-  await ensureDefaultCadence(profile.id);
+    await ensureDefaultCadence(profile.id);
 
-  return await prisma.cadenceEngine.findFirst({
-    where: { profileId: profile.id },
-    include: { stages: { orderBy: { order: 'asc' } } }
-  });
+    return await prisma.cadenceEngine.findFirst({
+      where: { profileId: profile.id },
+      include: { stages: { orderBy: { order: 'asc' } } }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar configurações da cadência:', error);
+    return null;
+  }
 }
 
 /**

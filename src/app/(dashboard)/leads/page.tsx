@@ -28,11 +28,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const activeTemplates = temp.filter(t => t.isActive);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Users className="w-5 h-5 text-white" />
             </div>
@@ -51,15 +51,15 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
 
       {/* Tabela */}
       <Suspense fallback={
-        <div className="bg-white rounded-3xl border border-slate-200 h-64 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-slate-200 h-64 flex items-center justify-center">
           <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
         </div>
       }>
         <LeadsTableWrapper
-          leads={leads}
-          total={total}
-          page={page}
-          totalPages={totalPages}
+          initialLeads={leads}
+          initialTotal={total}
+          initialPage={page}
+          initialTotalPages={totalPages}
           templates={activeTemplates}
         />
       </Suspense>
