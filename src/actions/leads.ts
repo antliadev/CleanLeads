@@ -59,7 +59,12 @@ export async function getLeads({
     ...(stage && {
       ...(stage === 'none' 
         ? { cadenceEngine: null } 
-        : { cadenceEngine: { currentStageOrder: parseInt(stage) } }
+        : { 
+            cadenceEngine: {
+              isNot: null,
+              currentStageOrder: parseInt(stage)
+            }
+          }
       )
     }),
   };
