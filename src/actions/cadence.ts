@@ -616,10 +616,15 @@ export async function startLeadCadenceBulk(leadIds: string[]) {
  * Move múltiplos leads para um estágio específico da cadência
  */
 export async function bulkUpdateLeadStage(leadIds: string[], targetStage: number, operatorId: string) {
+  // Validar entrada
+  const parsedStage = Number(targetStage);
+  if (isNaN(parsedStage) || parsedStage < 1) {
+    throw new Error('Estágio inválido. Selecione um estágio válido.');
+  }
+
   const profile = await getAuthProfile();
   if (!profile) throw new Error('Não autorizado');
   if (!leadIds || leadIds.length === 0) throw new Error('Nenhum lead selecionado');
-  if (!targetStage || targetStage < 1) throw new Error('Estágio inválido');
 
   const cadence = await prisma.cadenceEngine.findFirst({
     where: {

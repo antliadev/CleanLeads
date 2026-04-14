@@ -61,10 +61,16 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   async function handleBulkUpdateStage() {
     if (!selectedStageForBulk || !activeOperator) return;
     
+    const stageNum = parseInt(selectedStageForBulk);
+    if (isNaN(stageNum) || stageNum < 1) {
+      toast.error('Selecione um estágio válido');
+      return;
+    }
+    
     setIsBulkUpdatingStage(true);
     try {
       const { bulkUpdateLeadStage } = await import('@/actions/cadence');
-      await bulkUpdateLeadStage(selectedIds, parseInt(selectedStageForBulk), activeOperator.id);
+      await bulkUpdateLeadStage(selectedIds, stageNum, activeOperator.id);
       toast.success(`${selectedIds.length} leads movidos para o estágio ${selectedStageForBulk}.`);
       setSelectedIds([]);
       setSelectedStageForBulk('');
@@ -86,42 +92,46 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <>
-              {/* Botão Alterar Estágio */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (!selectedStageForBulk) {
-                      toast.error('Selecione um estágio primeiro');
-                      return;
-                    }
-                    if (!activeOperator) {
-                      toast.error('Selecione um operador');
-                      return;
-                    }
-                    // Confirmar e executar
-                    handleBulkUpdateStage();
-                  }}
-                  disabled={isBulkUpdatingStage}
-                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+              {/* Seleção de Estágio para Alteração em Massa */}
+              <select
+                value={selectedStageForBulk}
+                onChange={(e) => setSelectedStageForBulk(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-sm font-medium px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                <option value="">Selecione estágio...</option>
+                <option value="1">Estágio 1</option>
+                <option value="2">Estágio 2</option>
+                <option value="3">Estágio 3</option>
+                <option value="4">Estágio 4</option>
+                <option value="5">Estágio 5</option>
+                <option value="6">Estágio 6</option>
+              </select>
+
+              {/* Botão Alterar Estágio - com confirmação */}
+              {selectedStageForBulk ? (
+                <ConfirmDialog
+                  title="Alterar Estágio em Massa"
+                  description={`Tem certeza que deseja mover ${selectedIds.length} lead(s) para o Estágio ${selectedStageForBulk}? Esta ação não pode ser desfeita.`}
+                  onConfirm={handleBulkUpdateStage}
+                  destructive={false}
                 >
-                  {isBulkUpdatingStage ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  <button
+                    disabled={isBulkUpdatingStage}
+                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isBulkUpdatingStage ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                    Alterar Estágio ({selectedIds.length})
+                  </button>
+                </ConfirmDialog>
+              ) : (
+                <button
+                  disabled
+                  className="flex items-center gap-2 bg-amber-300 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all opacity-50 cursor-not-allowed"
+                >
+                  <RefreshCw className="w-4 h-4" />
                   Alterar Estágio ({selectedIds.length})
                 </button>
-                <select
-                  value={selectedStageForBulk}
-                  onChange={(e) => setSelectedStageForBulk(e.target.value)}
-                  className="absolute right-0 top-0 h-full opacity-0 cursor-pointer"
-                  style={{ width: '140px' }}
-                >
-                  <option value="">Selecione...</option>
-                  <option value="1">Estágio 1</option>
-                  <option value="2">Estágio 2</option>
-                  <option value="3">Estágio 3</option>
-                  <option value="4">Estágio 4</option>
-                  <option value="5">Estágio 5</option>
-                  <option value="6">Estágio 6</option>
-                </select>
-              </div>
+              )}
 
               {/* Botão Iniciar Cadência */}
               <button
