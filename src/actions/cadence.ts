@@ -616,126 +616,133 @@ export async function startLeadCadenceBulk(leadIds: string[]) {
  * Move múltiplos leads para um estágio específico da cadência
  */
 export async function bulkUpdateLeadStage(leadIds: string[], targetStage: number, operatorId: string) {
-  const parsedStage = Number(targetStage);
-  if (isNaN(parsedStage) || parsedStage < 1) {
-    throw new Error('Estágio inválido. Selecione um estágio válido.');
-  }
-
-  const profile = await getAuthProfile();
-  if (!profile) throw new Error('Não autorizado');
-  if (!leadIds || leadIds.length === 0) throw new Error('Nenhum lead selecionado');
-
-  const cadence = await prisma.cadenceEngine.findFirst({
-    where: {
-      OR: [
-        { profileId: profile.id, isActive: true },
-        { profileId: null, isActive: true }
-      ]
-    },
-    include: { stages: { orderBy: { order: 'asc' } } }
-  });
-
-  if (!cadence || cadence.stages.length === 0) {
-    throw new Error('CONFIG_ERROR: Nenhuma cadência configurada.');
-  }
-
-  const targetStageData = cadence.stages.find((s: any) => s.order === targetStage);
-  if (!targetStageData) {
-    throw new Error(`Estágio ${targetStage} não existe na cadência.`);
-  }
-
-  const now = new Date();
-  const delay = targetStageData.delayDays || 0;
-  const nextScheduledAt = new Date(now.getTime() + delay * 24 * 60 * 60 * 1000);
-
-  const results = await prisma.$transaction(async (tx) => {
-    const outputs = [];
-    
-    for (const leadId of leadIds) {
-      // Verifica se o lead já tem um progresso de cadência
-      const existingProgress = await tx.leadCadenceProgress.findUnique({
-        where: { leadId }
-      });
-
-      if (existingProgress) {
-        // Lead já está na cadência - atualiza o estágio
-        const updated = await tx.leadCadenceProgress.update({
-          where: { id: existingProgress.id },
-          data: {
-            currentStageOrder: targetStage,
-            status: 'ACTIVE',
-            nextScheduledAt,
-            lastActionAt: now,
-            pausedAt: null,
-            finishedAt: null,
-            exitReason: null,
-            version: { increment: 1 }
-          }
-        });
-
-        await tx.leadCadenceEvent.create({
-          data: {
-            leadCadenceProgressId: existingProgress.id,
-            leadId,
-            action: 'MANUAL_STAGE_CHANGE',
-            fromStage: existingProgress.currentStageOrder,
-            toStage: targetStage,
-            operatorId,
-            notes: `Alteração de estágio em massa para o estágio ${targetStage}`
-          }
-        });
-
-        await tx.leadNote.create({
-          data: {
-            leadId,
-            operatorId,
-            content: `[SISTEMA] Estágio alterado para ${targetStage} via alteração em massa`
-          }
-        });
-
-        outputs.push(updated);
-      } else {
-        // Lead não está na cadência - cria novo progresso a partir do estágio
-        const created = await tx.leadCadenceProgress.create({
-          data: {
-            profileId: profile.id,
-            leadId,
-            cadenceId: cadence.id,
-            currentStageOrder: targetStage,
-            status: 'ACTIVE',
-            nextScheduledAt,
-            lastActionAt: now
-          }
-        });
-
-        await tx.leadCadenceEvent.create({
-          data: {
-            leadCadenceProgressId: created.id,
-            leadId,
-            action: 'START',
-            toStage: targetStage,
-            operatorId,
-            notes: `Cadência iniciada no estágio ${targetStage} via alteração em massa`
-          }
-        });
-
-        await tx.leadNote.create({
-          data: {
-            leadId,
-            operatorId,
-            content: `[SISTEMA] Cadência iniciada no estágio ${targetStage} via alteração em massa`
-          }
-        });
-
-        outputs.push(created);
-      }
+  try {
+    const parsedStage = Number(targetStage);
+    if (isNaN(parsedStage) || parsedStage < 1) {
+      throw new Error('Estágio inválido. Selecione um estágio válido.');
     }
-    return outputs;
-  });
 
-  revalidatePath('/leads');
-  revalidatePath('/agenda');
-  return { success: true, count: results.length };
+    const profile = await getAuthProfile();
+    if (!profile) throw new Error('Não autorizado');
+    if (!leadIds || leadIds.length === 0) throw new Error('Nenhum lead selecionado');
+
+    const cadence = await prisma.cadenceEngine.findFirst({
+      where: {
+        OR: [
+          { profileId: profile.id, isActive: true },
+          { profileId: null, isActive: true }
+        ]
+      },
+      include: { stages: { orderBy: { order: 'asc' } } }
+    });
+
+    if (!cadence || cadence.stages.length === 0) {
+      throw new Error('Nenhuma cadência configurada.');
+    }
+
+    const targetStageData = cadence.stages.find((s: any) => s.order === targetStage);
+    if (!targetStageData) {
+      throw new Error(`Estágio ${targetStage} não existe na cadência.`);
+    }
+
+    const now = new Date();
+    const delay = targetStageData.delayDays || 0;
+    const nextScheduledAt = new Date(now.getTime() + delay * 24 * 60 * 60 * 1000);
+
+    const results = await prisma.$transaction(async (tx) => {
+      const outputs = [];
+      
+      for (const leadId of leadIds) {
+        try {
+          const existingProgress = await tx.leadCadenceProgress.findUnique({
+            where: { leadId }
+          });
+
+          if (existingProgress) {
+            const updated = await tx.leadCadenceProgress.update({
+              where: { id: existingProgress.id },
+              data: {
+                currentStageOrder: targetStage,
+                status: 'ACTIVE',
+                nextScheduledAt,
+                lastActionAt: now,
+                pausedAt: null,
+                finishedAt: null,
+                exitReason: null,
+                version: { increment: 1 }
+              }
+            });
+
+            await tx.leadCadenceEvent.create({
+              data: {
+                leadCadenceProgressId: existingProgress.id,
+                leadId,
+                action: 'MANUAL_STAGE_CHANGE',
+                fromStage: existingProgress.currentStageOrder,
+                toStage: targetStage,
+                operatorId,
+                notes: `Alteração para estágio ${targetStage}`
+              }
+            });
+
+            await tx.leadNote.create({
+              data: {
+                leadId,
+                operatorId,
+                content: `Estágio alterado para ${targetStage}`
+              }
+            });
+
+            outputs.push(updated);
+          } else {
+            const created = await tx.leadCadenceProgress.create({
+              data: {
+                profileId: profile.id,
+                leadId,
+                cadenceId: cadence.id,
+                currentStageOrder: targetStage,
+                status: 'ACTIVE',
+                nextScheduledAt,
+                lastActionAt: now
+              }
+            });
+
+            await tx.leadCadenceEvent.create({
+              data: {
+                leadCadenceProgressId: created.id,
+                leadId,
+                action: 'START',
+                toStage: targetStage,
+                operatorId,
+                notes: `Iniciado no estágio ${targetStage}`
+              }
+            });
+
+            await tx.leadNote.create({
+              data: {
+                leadId,
+                operatorId,
+                content: `Cadência iniciada no estágio ${targetStage}`
+              }
+            });
+
+            outputs.push(created);
+          }
+        } catch (innerError: any) {
+          console.error('Erro ao processar lead:', leadId, innerError.message);
+        }
+      }
+
+      return outputs;
+    });
+
+    revalidatePath('/agenda');
+    revalidatePath('/leads');
+    return { success: true, count: results.length };
+  } catch (error: any) {
+    console.error('bulkUpdateLeadStage error:', error.message);
+    throw new Error(error.message || 'Erro ao alterar estágio');
+  }
 }
 
 /**
