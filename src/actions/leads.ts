@@ -56,12 +56,6 @@ export async function getLeads({
       ],
     }),
     ...(status && { status: status as LeadStatus }),
-    ...(stage && {
-      ...(stage === 'none' 
-        ? { NOT: { cadenceEngine: { id: { not: '' } } } } 
-        : { cadenceEngine: { currentStageOrder: parseInt(stage) } }
-      )
-    }),
   };
 
   const [leads, total] = await Promise.all([
@@ -104,7 +98,18 @@ export async function getLeads({
     prisma.lead.count({ where }),
   ]);
 
-  return { leads, total, page, totalPages: Math.ceil(total / take) };
+  // Filtrar stage na memória (workaround para relação optional)
+  let filteredLeads = leads;
+  if (stage) {
+    if (stage === 'none') {
+      filteredLeads = leads.filter(l => !l.cadenceEngine);
+    } else {
+      const stageNum = parseInt(stage);
+      filteredLeads = leads.filter(l => l.cadenceEngine?.currentStageOrder === stageNum);
+    }
+  }
+
+  return { leads: filteredLeads, total, page, totalPages: Math.ceil(total / take) };
 }
 
 /**
