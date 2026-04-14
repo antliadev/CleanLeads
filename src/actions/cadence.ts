@@ -615,8 +615,6 @@ export async function startLeadCadenceBulk(leadIds: string[]) {
  * ALTERAÇÃO DE ESTÁGIO EM MASSA
  * Move múltiplos leads para um estágio específico da cadência
  */
-export const maxDuration = 60;
-
 export async function bulkUpdateLeadStage(leadIds: string[], targetStage: number, operatorId: string) {
   const parsedStage = Number(targetStage);
   if (isNaN(parsedStage) || parsedStage < 1) {
