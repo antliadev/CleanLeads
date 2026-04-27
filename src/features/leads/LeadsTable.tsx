@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
