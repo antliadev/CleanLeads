@@ -217,19 +217,30 @@ export async function logout() {
 }
 
 export async function getAuthProfile() {
-  const supabase = await createServerSupabase();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Não autenticado');
+  try {
+    const supabase = await createServerSupabase();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      console.error('getAuthProfile: erro auth:', error);
+      throw new Error('Não autenticado');
+    }
 
-  const profile = await prisma.profile.upsert({
-    where: { authUid: user.id },
-    update: {},
-    create: {
-      authUid: user.id,
-      email: user.email!,
-      name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
-    },
-  });
+    const profile = await prisma.profile.upsert({
+      where: { authUid: user.id },
+      update: {},
+      create: {
+        authUid: user.id,
+        email: user.email!,
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário',
+      },
+    });
 
-  return profile;
+    return profile;
+  } catch (err: any) {
+    console.error('getAuthProfile erro:', err.message);
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('connection')) {
+      throw new Error('Banco de dados indisponível. Verifique se o projeto Supabase está ativo.');
+    }
+    throw err;
+  }
 }

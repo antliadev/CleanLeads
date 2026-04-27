@@ -43,8 +43,21 @@ export async function getLeads({
   let profile;
   try {
     profile = await getAuthProfile();
-  } catch (authError) {
-    console.error('getLeads: Erro ao buscar perfil:', authError);
+  } catch (authError: any) {
+    const errorMsg = authError?.message || '';
+    console.error('getLeads: Erro ao buscar perfil:', errorMsg);
+    
+    // Verifica se é erro de conexão
+    if (errorMsg.includes('indisponível') || errorMsg.includes('connection') || errorMsg.includes('ECONNREFUSED')) {
+      return { 
+        leads: [], 
+        total: 0, 
+        page: 1, 
+        totalPages: 0,
+        error: 'Banco de dados indisponível. Verifique se o projeto Supabase está ativo (não pausado).'
+      };
+    }
+    
     return { 
       leads: [], 
       total: 0, 
