@@ -17,9 +17,14 @@ interface LeadsTableWrapperProps {
 export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, initialTotalPages, templates }: LeadsTableWrapperProps) {
   const router = useRouter();
   
+  // Garantir que os dados iniciais são sempre válidos
+  const safeLeads = Array.isArray(initialLeads) ? initialLeads : [];
+  const safeTotal = typeof initialTotal === 'number' && initialTotal >= 0 ? initialTotal : 0;
+  const safeTemplates = Array.isArray(templates) ? templates : [];
+  
   // Estado inicial
-  const [leads, setLeads] = useState<LeadWithHistory[]>(initialLeads);
-  const [total, setTotal] = useState(initialTotal);
+  const [leads, setLeads] = useState<LeadWithHistory[]>(safeLeads);
+  const [total, setTotal] = useState(safeTotal);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialPage < initialTotalPages);
   const [currentPage, setCurrentPage] = useState(initialPage);
