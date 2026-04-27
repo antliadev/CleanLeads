@@ -1,21 +1,31 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Search, X, Loader2 } from 'lucide-react';
-import { useCallback, useTransition, useState, useEffect } from 'react';
+import { useTransition, useState, useEffect } from 'react';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 export function LeadFilters() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const currentSearch = searchParams.get('search') || '';
-  const currentStatus = searchParams.get('status') || '';
-  const currentStage = searchParams.get('stage') || '';
+  // Lê parâmetros diretamente da URL
+  const getParams = () => {
+    if (typeof window === 'undefined') {
+      return { search: '', status: '', stage: '' };
+    }
+    const params = new URLSearchParams(window.location.search);
+    return {
+      search: params.get('search') || '',
+      status: params.get('status') || '',
+      stage: params.get('stage') || ''
+    };
+  };
+
+  const { search: currentSearch, status: currentStatus, stage: currentStage } = getParams();
   
-// Estado local para o input (busca manual - apenas ao pressionar Enter ou clicar no botão)
+  // Estado local para o input (busca manual)
   const [localSearch, setLocalSearch] = useState(currentSearch);
   const normalizeSearch = (s: string) =>
     s
@@ -24,33 +34,31 @@ export function LeadFilters() {
       .replace(/\s+/g, ' ')
       .trim();
 
-  // Sincroniza o localSearch quando o parâmetro da URL mudar externamente (ex: Limpar Filtros)
+  // Sincroniza o localSearch quando a URL mudar
   useEffect(() => {
-    setLocalSearch(currentSearch);
+    const params = getParams();
+    setLocalSearch(params.search);
   }, [currentSearch]);
 
-  const updateUrl = useCallback(
-    (newParams: Record<string, string>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      
-      Object.entries(newParams).forEach(([key, value]) => {
-        if (value) {
-          params.set(key, value);
-        } else {
-          params.delete(key);
-        }
-      });
-      
-      params.delete('page'); // reset paginação ao filtrar
-      
-      startTransition(() => {
-        router.push(`/leads?${params.toString()}`);
-      });
-    },
-    [router, searchParams]
-  );
+  const updateUrl = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(window.location.search);
+    
+    Object.entries(newParams).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    
+    params.delete('page'); // reset paginação ao filtrar
+    
+    startTransition(() => {
+      router.push(`/leads?${params.toString()}`);
+    });
+  };
 
-const handleSearch = () => {
+  const handleSearch = () => {
     const normalized = normalizeSearch(localSearch);
     updateUrl({ search: normalized });
   };
@@ -98,7 +106,7 @@ const handleSearch = () => {
         </button>
       </div>
 
-      {/* Filtro de status - Continua instantâneo por padrão de UX */}
+      {/* Filtro de status */}
       <select
         value={currentStatus}
         onChange={(e) => updateUrl({ status: e.target.value })}
@@ -114,7 +122,7 @@ const handleSearch = () => {
         ))}
       </select>
 
-      {/* Filtro de Estágio - Seletor Visual */}
+      {/* Filtro de Estágio */}
       <select
         value={currentStage}
         onChange={(e) => updateUrl({ stage: e.target.value })}
@@ -129,12 +137,12 @@ const handleSearch = () => {
         <option value="1">Passo 1 - LinkedIn</option>
         <option value="2">Passo 2 - LinkedIn</option>
         <option value="3">Passo 3 - E-mail</option>
-        <option value="4">Passo 4 - WhatsApp</option>
+        <option value="4"> Passo 4 - WhatsApp</option>
         <option value="5">Passo 5 - LinkedIn</option>
         <option value="6">Passo 6 - E-mail</option>
       </select>
 
-      {/* Botoes de Limpeza */}
+      {/* Botão Limpar */}
       {hasFilters && (
         <button
           onClick={clearAll}
