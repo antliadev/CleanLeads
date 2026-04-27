@@ -3,6 +3,8 @@ import { FileText, Plus } from 'lucide-react';
 import { getTemplates } from '@/actions/templates';
 import { TemplatesClient } from '@/features/templates/TemplatesClient';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Templates – LimpaLeads',
   description: 'Mensagens padronizadas para LinkedIn e E-mail',

@@ -2,6 +2,8 @@ import { LayoutDashboard } from 'lucide-react';
 import { getAnalytics } from '@/actions/analytics';
 import { AnalyticsDashboard } from '@/features/analytics/AnalyticsDashboard';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Dashboard – LimpaLeads',
   description: 'Visão geral do desempenho dos seus leads',

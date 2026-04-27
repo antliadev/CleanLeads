@@ -5,6 +5,8 @@ import { getTemplates } from '@/actions/templates';
 import { OperatorsClient } from '@/features/operators/OperatorsClient';
 import { CadenceSettings } from '@/features/cadence/components/CadenceSettings';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Configurações | LimpaLeads',
   description: 'Configurações do LimpaLeads',
