@@ -15,8 +15,14 @@ export function LeadFilters() {
   const currentStatus = searchParams.get('status') || '';
   const currentStage = searchParams.get('stage') || '';
   
-  // Estado local para o input (não dispara busca imediata)
+// Estado local para o input (busca manual - apenas ao pressionar Enter ou clicar no botão)
   const [localSearch, setLocalSearch] = useState(currentSearch);
+  const normalizeSearch = (s: string) =>
+    s
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
   // Sincroniza o localSearch quando o parâmetro da URL mudar externamente (ex: Limpar Filtros)
   useEffect(() => {
@@ -44,8 +50,9 @@ export function LeadFilters() {
     [router, searchParams]
   );
 
-  const handleSearch = () => {
-    updateUrl({ search: localSearch.trim() });
+const handleSearch = () => {
+    const normalized = normalizeSearch(localSearch);
+    updateUrl({ search: normalized });
   };
 
   const clearAll = () => {

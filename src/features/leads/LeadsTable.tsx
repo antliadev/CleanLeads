@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Pencil, Trash2, Mail, Phone, Plus, ChevronLeft, ChevronRight, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
 
 import { LinkedinIcon } from '@/components/icons/Linkedin';
@@ -28,11 +28,13 @@ interface LeadsTableProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
+  isRefreshing?: boolean;
+  filtersActive?: boolean;
 }
 
-export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange, hasMore, onLoadMore, isLoadingMore }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange, hasMore, onLoadMore, isLoadingMore, isRefreshing: externalRefreshing, filtersActive }: LeadsTableProps) {
   const router = useRouter();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshingInternal, setIsRefreshingInternal] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadWithHistory | null>(null);
   const [creating, setCreating] = useState(false);
   const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null; channel: TemplateChannel }>({ 
@@ -47,15 +49,17 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   const [isBulkUpdatingStage, setIsBulkUpdatingStage] = useState(false);
   const { activeOperator } = useOperator();
 
+  // Combina estados de refreshing (interno + externo)
+  const isRefreshing = isRefreshingInternal || externalRefreshing || false;
+
   async function handleDelete(id: string) {
     await deleteLead(id);
   }
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
+    setIsRefreshingInternal(true);
     router.refresh();
-    // Simula um delay para o feedback visual da animação
-    setTimeout(() => setIsRefreshing(false), 600);
+    setTimeout(() => setIsRefreshingInternal(false), 600);
   };
 
   async function handleBulkUpdateStage() {

@@ -46,6 +46,8 @@ export async function getLeads({
   const take = DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * take;
 
+  // Build filters for DB, including stage in DB when possible
+  // Stage filter will be applied in-memory as a fallback (DB-side stage filtering is currently not supported by typing here)
   const where = {
     profileId: profile.id,
     ...(search && {
@@ -56,6 +58,7 @@ export async function getLeads({
       ],
     }),
     ...(status && { status: status as LeadStatus }),
+    // stage filter applied in-memory below
   };
 
   const [leads, total] = await Promise.all([
@@ -98,18 +101,20 @@ export async function getLeads({
     prisma.lead.count({ where }),
   ]);
 
-  // Filtrar stage na memória (workaround para relação optional)
+  // Stage filtering fallback: apply stage filter in-memory if needed
   let filteredLeads = leads;
   if (stage) {
     if (stage === 'none') {
-      filteredLeads = leads.filter(l => !l.cadenceEngine);
+      filteredLeads = leads.filter((l: any) => !l.cadenceEngine);
     } else {
       const stageNum = parseInt(stage);
-      filteredLeads = leads.filter(l => l.cadenceEngine?.currentStageOrder === stageNum);
+      filteredLeads = leads.filter((l: any) => l.cadenceEngine?.currentStageOrder === stageNum);
     }
   }
 
-  return { leads: filteredLeads, total, page, totalPages: Math.ceil(total / take) };
+  const finalTotal = filteredLeads.length;
+  const finalTotalPages = Math.ceil(finalTotal / take);
+  return { leads: filteredLeads, total: finalTotal, page, totalPages: finalTotalPages };
 }
 
 /**

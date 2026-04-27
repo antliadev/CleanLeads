@@ -74,6 +74,7 @@ export async function login(_prevState: AuthResult | null, formData: FormData): 
 
 // ═══════════════════════════════════════════
 // Registro Simplificado (Email, Nome e Senha em um passo)
+// Requisito: "Confirm email" DEVE estar OFF no Supabase Dashboard
 // ═══════════════════════════════════════════
 export async function register(_prevState: AuthResult | null, formData: FormData): Promise<AuthResult> {
   const raw = Object.fromEntries(formData.entries());
@@ -88,40 +89,32 @@ export async function register(_prevState: AuthResult | null, formData: FormData
     return { success: false, error: parsed.error.issues[0].message };
   }
 
-  const email = emailParsed.data.email;
-  const password = parsed.data.password;
-  const name = parsed.data.name;
+  const supabase = await createServerSupabase();
 
-  // Usa o Admin Client para criar o usuário já com e-mail confirmado,
-  // eliminando a necessidade de verificação de e-mail.
-  const adminSupabase = createAdminSupabase();
-
-  const { data: adminData, error: adminError } = await adminSupabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: name },
+  // Com "Confirm email" OFF no Supabase, signUp retorna sessão imediatamente
+  const { data, error } = await supabase.auth.signUp({
+    email: emailParsed.data.email,
+    password: parsed.data.password,
+    options: {
+      data: { full_name: parsed.data.name },
+    },
   });
 
-  if (adminError) {
-    return { success: false, error: 'Erro ao realizar cadastro: ' + adminError.message };
+  if (error) {
+    return { success: false, error: 'Erro ao realizar cadastro: ' + error.message };
   }
 
-  if (!adminData.user) {
-    return { success: false, error: 'Erro inesperado ao criar usuário.' };
+  if (data.session) {
+    // Usuário criado e sessão iniciada — sincroniza perfil e entra no sistema
+    await getAuthProfile();
+    redirect('/leads');
   }
 
-  // Após criar o usuário confirmado, faz login automático com as credenciais
-  const supabase = await createServerSupabase();
-  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (signInError) {
-    return { success: false, error: 'Usuário criado, mas erro ao iniciar sessão: ' + signInError.message };
-  }
-
-  // Sincroniza perfil no Prisma e redireciona
-  await getAuthProfile();
-  redirect('/leads');
+  // Fallback: se ainda precisar confirmar (não deveria chegar aqui)
+  return {
+    success: true,
+    error: 'Cadastro realizado! Faça login para acessar o sistema.',
+  };
 }
 
 // ═══════════════════════════════════════════

@@ -11,7 +11,9 @@ import {
   Copy,
   Check,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, getLinkedinProfileUrl, getGmailComposeUrl, getWhatsAppUrl } from '@/lib/utils';
@@ -23,6 +25,8 @@ import { advanceCadenceStage, pauseLeadCadence, resumeLeadCadence, lockLead } fr
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ContactActionModal } from '@/features/leads/ContactActionModal';
+import type { TemplateChannel } from '@prisma/client';
 
 interface LeadActionDrawerProps {
   isOpen: boolean;
@@ -37,7 +41,21 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [compiledText, setCompiledText] = useState('');
+  const [selectedChannel, setSelectedChannel] = useState<string>('LINKEDIN');
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const { activeOperator } = useOperator();
+
+  // Determina o canal padrão (do estágio)
+  const currentStage = leadProgress?.currentStage;
+  const defaultChannel = currentStage?.channel || 'LINKEDIN';
+
+  // Reseta o canal selecionado quando o drawer abre com um novo lead
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedChannel(defaultChannel);
+      setContactModalOpen(false);
+    }
+  }, [isOpen, leadProgress?.id]);
 
   // Trava scroll da página quando drawer abre
   useEffect(() => {
@@ -57,21 +75,26 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
     }
   }, [isOpen, leadProgress?.id, activeOperator]);
 
-  const currentStage = leadProgress?.currentStage;
-  const filteredTemplates = (templates || []).filter(t => t.channel === currentStage?.channel && t.isActive);
+  // Filtra templates por canal selecionado
+  const filteredTemplates = (templates || []).filter(t => t.channel === selectedChannel && t.isActive);
 
-  // Inicializa o template do estágio se houver
+  // Inicializa o template quando o canal muda
   useEffect(() => {
-    if (isOpen && currentStage?.templateId) {
-      setSelectedTemplateId(currentStage.templateId);
-    } else if (isOpen && filteredTemplates.length > 0 && !selectedTemplateId) {
+    if (isOpen && filteredTemplates.length > 0 && !selectedTemplateId) {
       setSelectedTemplateId(filteredTemplates[0].id);
+    } else if (isOpen && filteredTemplates.length > 0 && selectedTemplateId) {
+      // Garante que o template selecionado ainda é válido para o canal
+      if (!filteredTemplates.find(t => t.id === selectedTemplateId)) {
+        setSelectedTemplateId(filteredTemplates[0].id);
+      }
+    } else {
+      setSelectedTemplateId(null);
     }
-  }, [isOpen, currentStage, filteredTemplates, selectedTemplateId]);
+  }, [isOpen, selectedChannel]);
 
   const selectedTemplate = filteredTemplates.find(t => t.id === selectedTemplateId);
 
-  // Sincroniza o texto compilado sempre que o lead ou template mudar
+  // Sincroniza o texto compilado sempre que o template ou lead mudar
   useEffect(() => {
     if (selectedTemplate && leadProgress?.lead) {
       setCompiledText(interpolateTemplate(selectedTemplate.body, leadProgress.lead));
@@ -206,7 +229,7 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
             {activeTab === 'ACTION' && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
                 
-                {/* Canal de Ação */}
+{/* Canal de Ação */}
                 <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border-2 border-indigo-100 dark:border-indigo-900/30 p-8 rounded-[2.5rem] relative overflow-hidden group/stage">
                   <div className="relative space-y-4">
                     <div className="flex items-center gap-3">
@@ -214,9 +237,97 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                       <h4 className="font-black text-indigo-900 dark:text-indigo-100">Tarefa para Agora</h4>
                     </div>
                     
+                    {/* Seletor de Canal */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-indigo-900/40 uppercase tracking-widest pl-1">
+                        Canal de Contato
+                      </label>
+                      <div className="flex gap-2">
+                        {/* LinkedIn */}
+                        <button
+                          onClick={() => setSelectedChannel('LINKEDIN')}
+                          disabled={!leadProgress.lead.linkedinUrl}
+                          title={!leadProgress.lead.linkedinUrl ? 'Lead não possui LinkedIn' : 'LinkedIn'}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-2xl border-2 transition-all",
+                            selectedChannel === 'LINKEDIN'
+                              ? "bg-blue-100 dark:bg-blue-900/30 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-300"
+                              : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-slate-300 dark:hover:border-slate-700",
+                            !leadProgress.lead.linkedinUrl && "opacity-40 cursor-not-allowed"
+                          )}
+                        >
+                          <LinkedinIcon className="w-5 h-5" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">LinkedIn</span>
+                          {!leadProgress.lead.linkedinUrl && (
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500">Sem URL</span>
+                          )}
+                        </button>
+
+                        {/* Email */}
+                        <button
+                          onClick={() => setSelectedChannel('EMAIL')}
+                          disabled={!leadProgress.lead.email}
+                          title={!leadProgress.lead.email ? 'Lead não possui e-mail' : 'E-mail'}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-2xl border-2 transition-all",
+                            selectedChannel === 'EMAIL'
+                              ? "bg-indigo-100 dark:bg-indigo-900/30 border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-300"
+                              : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-slate-300 dark:hover:border-slate-700",
+                            !leadProgress.lead.email && "opacity-40 cursor-not-allowed"
+                          )}
+                        >
+                          <Mail className="w-5 h-5" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">E-mail</span>
+                          {!leadProgress.lead.email && (
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500">Sem e-mail</span>
+                          )}
+                        </button>
+
+                        {/* WhatsApp */}
+                        <button
+                          onClick={() => setSelectedChannel('WHATSAPP')}
+                          disabled={!leadProgress.lead.phone}
+                          title={!leadProgress.lead.phone ? 'Lead não possui telefone' : 'WhatsApp'}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-2xl border-2 transition-all",
+                            selectedChannel === 'WHATSAPP'
+                              ? "bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 dark:border-emerald-400 text-emerald-600 dark:text-emerald-300"
+                              : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-slate-300 dark:hover:border-slate-700",
+                            !leadProgress.lead.phone && "opacity-40 cursor-not-allowed"
+                          )}
+                        >
+                          <Phone className="w-5 h-5" />
+                          <span className="text-[10px] font-black uppercase tracking-wider">WhatsApp</span>
+                          {!leadProgress.lead.phone && (
+                            <span className="text-[9px] text-slate-400 dark:text-slate-500">Sem fone</span>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Aviso quando canal selecionado não tem contato */}
+                      {selectedChannel === 'LINKEDIN' && !leadProgress.lead.linkedinUrl && (
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-medium px-3">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                          Este lead não possui LinkedIn cadastrado. Escolha outro canal.
+                        </div>
+                      )}
+                      {selectedChannel === 'EMAIL' && !leadProgress.lead.email && (
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-medium px-3">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                          Este lead não possui e-mail cadastrado. Escolha outro canal.
+                        </div>
+                      )}
+                      {selectedChannel === 'WHATSAPP' && !leadProgress.lead.phone && (
+                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-medium px-3">
+                          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                          Este lead não possui telefone cadastrado. Escolha outro canal.
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <h3 className="text-xl font-black text-indigo-950 dark:text-indigo-50">
-                        {currentStage?.channel === 'LINKEDIN' ? 'Abordagem via LinkedIn' : currentStage?.channel === 'EMAIL' ? 'Envio de E-mail' : 'Contato WhatsApp'}
+                        {selectedChannel === 'LINKEDIN' ? 'Abordagem via LinkedIn' : selectedChannel === 'EMAIL' ? 'Envio de E-mail' : 'Contato WhatsApp'}
                       </h3>
                       <p className="text-indigo-700/60 dark:text-indigo-300/60 font-medium">Ação prioritária da cadência {leadProgress.cadence.name}.</p>
                     </div>
@@ -228,7 +339,8 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                             <select 
                               value={selectedTemplateId || ''} 
                               onChange={(e) => setSelectedTemplateId(e.target.value)}
-                              className="w-full appearance-none bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-sm"
+                              disabled={filteredTemplates.length === 0}
+                              className="w-full appearance-none bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-800 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {filteredTemplates.length === 0 && <option value="">Nenhum template para este canal</option>}
                               {filteredTemplates.map(t => (
@@ -259,51 +371,73 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                                <div className="absolute top-2 right-2 flex gap-1">
                                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-200" />
                                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-200" />
-                                </div>
+                               </div>
                             </div>
                          </div>
                        )}
 
-<button 
-                          onClick={async () => {
-                            if (!selectedTemplate) return toast.error('Selecione um template primeiro');
-                            
-                            // Copiar o texto primeiro
-                            try {
-                              await navigator.clipboard.writeText(compiledText);
-                              toast.success('Abordagem copiada!');
-                            } catch (err) {
-                              console.error('Erro ao copiar:', err);
-                              toast.error('Erro ao copiar. Tente novamente.');
-                              return;
-                            }
-                            
-                            // Redirecionamento Baseado no Canal
-                            const lead = leadProgress.lead;
-                            let url: string | null = null;
-                            
-                            if (currentStage?.channel === 'LINKEDIN') {
-                              url = getLinkedinProfileUrl(lead.linkedinUrl);
-                            } else if (currentStage?.channel === 'EMAIL') {
-                              url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, compiledText);
-                            } else if (currentStage?.channel === 'WHATSAPP') {
-                              url = getWhatsAppUrl(lead.phone, compiledText);
-                            }
+                       {/* Verifica se o canal selecionado tem contato disponível */}
+                       {(() => {
+                         const hasContact = 
+                           (selectedChannel === 'LINKEDIN' && leadProgress.lead.linkedinUrl) ||
+                           (selectedChannel === 'EMAIL' && leadProgress.lead.email) ||
+                           (selectedChannel === 'WHATSAPP' && leadProgress.lead.phone);
+                         return hasContact;
+                       })() ? (
+                         <div className="flex flex-col gap-2">
+                           <button 
+                             onClick={() => setContactModalOpen(true)}
+                             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100 dark:shadow-none"
+                           >
+                             {selectedChannel === 'LINKEDIN' ? <LinkedinIcon className="w-4 h-4" /> : selectedChannel === 'EMAIL' ? <Mail className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                             Abrir com {selectedChannel === 'LINKEDIN' ? 'LinkedIn' : selectedChannel === 'EMAIL' ? 'E-mail' : 'WhatsApp'}
+                           </button>
+                           <button 
+                             onClick={async () => {
+                               if (!selectedTemplate) return toast.error('Selecione um template primeiro');
+                               
+                               try {
+                                 await navigator.clipboard.writeText(compiledText);
+                                 toast.success('Abordagem copiada!');
+                               } catch (err) {
+                                 console.error('Erro ao copiar:', err);
+                                 toast.error('Erro ao copiar. Tente novamente.');
+                                 return;
+                               }
+                               
+                               const lead = leadProgress.lead;
+                               let url: string | null = null;
+                               
+                               if (selectedChannel === 'LINKEDIN') {
+                                 url = getLinkedinProfileUrl(lead.linkedinUrl);
+                               } else if (selectedChannel === 'EMAIL') {
+                                 url = getGmailComposeUrl(lead.email, lead.fullName, selectedTemplate.subject || undefined, compiledText);
+                               } else if (selectedChannel === 'WHATSAPP') {
+                                 url = getWhatsAppUrl(lead.phone, compiledText);
+                               }
 
-                            if (url) {
-                              // Abre a URL em nova aba
-                              const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-                              if (!newWindow) {
-                                toast.error('Popup bloqueado. Permita popups para esta página.');
-                              }
-                            } else {
-                              toast.error('URL não disponível para este lead.');
-                            }
-                          }}
-                          className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100 dark:shadow-none"
-                        >
-                           <Copy className="w-4 h-4" /> Copiar & Abrir Canal
-                        </button>
+                               if (url) {
+                                 const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                                 if (!newWindow) {
+                                   toast.error('Popup bloqueado. Permita popups para esta página.');
+                                 }
+                               } else {
+                                 toast.error('URL não disponível para este lead.');
+                               }
+                             }}
+                             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                           >
+                              <Copy className="w-4 h-4" /> Copiar Texto
+                           </button>
+                         </div>
+                       ) : (
+                         <button 
+                           disabled
+                           className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-2xl text-sm font-black cursor-not-allowed"
+                         >
+                            <AlertTriangle className="w-4 h-4" /> Canal Indisponível para este Lead
+                         </button>
+                       )}
                     </div>
                   </div>
                 </div>
@@ -392,6 +526,15 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
              </div>
           </div>
         </motion.div>
+
+        {/* Modal de Contato (mesma experiência da lista de leads) */}
+        <ContactActionModal
+          isOpen={contactModalOpen}
+          onClose={() => setContactModalOpen(false)}
+          lead={leadProgress.lead}
+          channel={selectedChannel as TemplateChannel}
+          templates={templates || []}
+        />
       </div>
     </AnimatePresence>
   );
