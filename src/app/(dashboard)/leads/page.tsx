@@ -15,7 +15,7 @@ interface LeadsData {
   error?: string;
 }
 
-export default function LeadsPage() {
+function LeadsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -156,7 +156,7 @@ export default function LeadsPage() {
 }
 
 // Wrapper com Suspense para o useSearchParams
-export function LeadsPageWithSuspense() {
+export default function LeadsPage() {
   return (
     <Suspense fallback={
       <div className="space-y-6">
@@ -166,7 +166,7 @@ export function LeadsPageWithSuspense() {
         </div>
       </div>
     }>
-      <LeadsPage />
+      <LeadsPageContent />
     </Suspense>
   );
 }
