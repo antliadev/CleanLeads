@@ -5,29 +5,45 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function createPrismaClient() {
+// Lazy initialization - só cria o cliente quando necessário
+function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   
   if (!connectionString) {
+    console.error('Prisma: DATABASE_URL não está definida');
     throw new Error('DATABASE_URL não configurada. Configure a variável de ambiente DATABASE_URL.');
   }
 
-  const adapter = new PrismaPg({ connectionString });
-
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  });
+  try {
+    const adapter = new PrismaPg({ connectionString });
+    const client = new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    });
+    return client;
+  } catch (error) {
+    console.error('Prisma: Erro ao criar cliente:', error);
+    throw error;
+  }
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
-
-// Lazy initialization - útil para build em ambiente sem DB
-export async function getPrisma() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL não configurada');
+// Get Prisma client with lazy initialization
+export function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
   }
-  return prisma;
+  return globalForPrisma.prisma;
+}
+
+// Re-export for backwards compatibility
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient();
+    return (client as any)[prop];
+  },
+});
+
+// For development, cache the client
+if (process.env.NODE_ENV !== 'production') {
+  getPrismaClient();
 }
