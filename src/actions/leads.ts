@@ -40,10 +40,31 @@ export async function getLeads({
   status?: string;
   stage?: string;
 } = {}) {
-  const profile = await getAuthProfile();
-  if (!profile) throw new Error('Não autorizado');
+  let profile;
+  try {
+    profile = await getAuthProfile();
+  } catch (authError) {
+    console.error('getLeads: Erro ao buscar perfil:', authError);
+    return { 
+      leads: [], 
+      total: 0, 
+      page: 1, 
+      totalPages: 0,
+      error: 'Não autorizado. Faça login novamente.'
+    };
+  }
   
-  const take = DEFAULT_PAGE_SIZE;
+  if (!profile) {
+    return { 
+      leads: [], 
+      total: 0, 
+      page: 1, 
+      totalPages: 0,
+      error: 'Não autorizado. Faça login novamente.'
+    };
+  }
+  
+const take = DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * take;
 
   // Build filters for DB, including stage in DB when possible
@@ -61,7 +82,8 @@ export async function getLeads({
     // stage filter applied in-memory below
   };
 
-  const [leads, total] = await Promise.all([
+  try {
+    const [leads, total] = await Promise.all([
     prisma.lead.findMany({
       where,
       include: { 
@@ -101,7 +123,7 @@ export async function getLeads({
     prisma.lead.count({ where }),
   ]);
 
-  // Stage filtering fallback: apply stage filter in-memory if needed
+// Stage filtering fallback: apply stage filter in-memory if needed
   let filteredLeads = leads;
   if (stage) {
     if (stage === 'none') {
@@ -115,6 +137,16 @@ export async function getLeads({
   const finalTotal = filteredLeads.length;
   const finalTotalPages = Math.ceil(finalTotal / take);
   return { leads: filteredLeads, total: finalTotal, page, totalPages: finalTotalPages };
+  } catch (error: any) {
+    console.error('getLeads: Erro ao buscar leads:', error);
+    return { 
+      leads: [], 
+      total: 0, 
+      page: 1, 
+      totalPages: 0,
+      error: error?.message || 'Erro ao carregar leads'
+    };
+  }
 }
 
 /**

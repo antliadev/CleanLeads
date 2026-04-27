@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
 import type { Template } from '@prisma/client';
@@ -17,66 +17,52 @@ interface LeadsTableWrapperProps {
 export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, initialTotalPages, templates }: LeadsTableWrapperProps) {
   const router = useRouter();
   
-  // Estado para carregar mais leads
+  // Estado inicial
   const [leads, setLeads] = useState<LeadWithHistory[]>(initialLeads);
   const [total, setTotal] = useState(initialTotal);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialPage < initialTotalPages);
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Carrega leads basado nos parâmetros atuais da URL
-  const loadLeads = useCallback(async (page: number = 1, forceRefresh: boolean = false) => {
-    // Lê params diretamente da URL
-    const params = new URLSearchParams(window.location.search);
-    const search = params.get('search') || '';
-    const status = params.get('status') || '';
-    const stage = params.get('stage') || '';
-    
-    // Se não há filtros e não é refresh forçado, mantém estado atual
-    if (!search && !status && !stage && !forceRefresh && page === 1 && leads.length > 0) {
-      return;
-    }
-
-    setIsRefreshing(true);
-    try {
-      const { getLeads } = await import('@/actions/leads');
-      const result = await getLeads({ 
-        page, 
-        search,
-        status,
-        stage
-      });
-      
-      if (result.leads) {
-        if (page === 1) {
-          setLeads(result.leads);
-        } else {
-          setLeads(prev => [...prev, ...result.leads]);
-        }
-        setTotal(result.total);
-        setCurrentPage(page);
-        setHasMore(page < result.totalPages);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar leads:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [leads.length]);
+  const [error, setError] = useState<string | null>(null);
 
   // Escuta mudanças na URL via popstate
   useEffect(() => {
-    const handlePopState = () => {
-      // Recarrega quando URL muda
-      loadLeads(1, true);
+    const handlePopState = async () => {
+      setIsRefreshing(true);
+      setError(null);
+      
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const { getLeads } = await import('@/actions/leads');
+        const result = await getLeads({ 
+          page: 1, 
+          search: params.get('search') || '',
+          status: params.get('status') || '',
+          stage: params.get('stage') || ''
+        });
+        
+        if (result.error) {
+          setError(result.error);
+        } else if (result.leads) {
+          setLeads(result.leads);
+          setTotal(result.total);
+          setCurrentPage(1);
+          setHasMore(1 < result.totalPages);
+        }
+      } catch (err) {
+        console.error('Erro ao recarregar leads:', err);
+        setError('Erro ao carregar dados');
+      } finally {
+        setIsRefreshing(false);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [loadLeads]);
+  }, []);
 
-  // Server action para carregar mais leads
+  // Carrega mais leads
   async function loadMoreLeads() {
     if (isLoadingMore || !hasMore) return;
     
@@ -99,8 +85,8 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
       } else {
         setHasMore(false);
       }
-    } catch (error) {
-      console.error('Erro ao carregar mais leads:', error);
+    } catch (err) {
+      console.error('Erro ao carregar mais leads:', err);
     } finally {
       setIsLoadingMore(false);
     }
@@ -110,25 +96,41 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
     const params = new URLSearchParams(window.location.search);
     params.set('page', String(newPage));
     window.history.pushState({}, '', `/leads?${params.toString()}`);
-    loadLeads(newPage);
+    
+    setCurrentPage(newPage);
+    setIsRefreshing(true);
+    
+    // Recarrega para a página solicitada
+    import('@/actions/leads').then(({ getLeads }) => {
+      getLeads({ 
+        page: newPage, 
+        search: params.get('search') || '',
+        status: params.get('status') || '',
+        stage: params.get('stage') || ''
+      }).then(result => {
+        if (result.leads) {
+          setLeads(result.leads);
+          setTotal(result.total);
+          setHasMore(newPage < result.totalPages);
+        }
+        setIsRefreshing(false);
+      });
+    });
   }
 
-  // Se o usuário navegar para uma página específica, volta ao comportamento padrão
-  if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    const pageParam = parseInt(params.get('page') || '1');
-    if (pageParam !== 1 && pageParam !== currentPage) {
-      return (
-        <LeadsTable
-          leads={initialLeads}
-          total={initialTotal}
-          page={initialPage}
-          totalPages={initialTotalPages}
-          templates={templates}
-          onPageChange={handlePageChange}
-        />
-      );
-    }
+  // Se há erro, mostra mensagem
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 p-8 flex flex-col items-center justify-center text-center">
+        <p className="text-red-600 font-medium mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl"
+        >
+          Recarregar página
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -136,7 +138,7 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
       leads={leads}
       total={total}
       page={currentPage}
-      totalPages={Math.ceil(total / 50)}
+      totalPages={Math.ceil(total / 50) || 1}
       templates={templates}
       onPageChange={handlePageChange}
       hasMore={hasMore}

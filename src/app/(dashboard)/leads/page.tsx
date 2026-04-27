@@ -21,7 +21,25 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const status = params.status || '';
   const stage = params.stage || '';
 
-  const { leads, total, totalPages } = await getLeads({ page, search, status, stage });
+  // Busca leads com erro handler
+  const result = await getLeads({ page, search, status, stage });
+  const leads = result.leads || [];
+  const total = result.total || 0;
+  const totalPages = result.totalPages || 1;
+  
+  // Se houver erro, mostra mensagem amigável
+  if (result.error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-extrabold text-slate-900">Leads</h1>
+        <div className="bg-white rounded-2xl border border-red-200 p-8 flex flex-col items-center justify-center text-center">
+          <p className="text-red-600 font-medium mb-4">{result.error}</p>
+          <p className="text-slate-500 text-sm">Tente fazer login novamente.</p>
+        </div>
+      </div>
+    );
+  }
+  
   // Opcional: injetamos os templates ativos para uso nos modais
   const { getTemplates } = await import('@/actions/templates');
   const temp = await getTemplates();
