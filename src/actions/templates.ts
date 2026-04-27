@@ -23,17 +23,23 @@ export type TemplateFormResult = { success: boolean; error?: string };
 import { getAuthProfile } from './auth';
 
 // ═══════════════════════
-// Listar templates
+// Listar templates (com proteção para SSR)
 // ═══════════════════════
-export async function getTemplates(channel?: TemplateChannel) {
-  const profile = await getAuthProfile();
-  return prisma.template.findMany({
-    where: {
-      profileId: profile.id,
-      ...(channel && { channel }),
-    },
-    orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
-  });
+export async function getTemplates(channel?: TemplateChannel): Promise<any[]> {
+  try {
+    const profile = await getAuthProfile();
+    const templates = await prisma.template.findMany({
+      where: {
+        profileId: profile.id,
+        ...(channel && { channel }),
+      },
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+    });
+    return templates;
+  } catch (error: any) {
+    console.error('getTemplates: erro ao buscar templates:', error);
+    return []; // Retorna array vazio para não quebrar SSR
+  }
 }
 
 // ═══════════════════════
