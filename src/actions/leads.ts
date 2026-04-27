@@ -77,11 +77,15 @@ export async function getLeads({
     };
   }
   
-const take = DEFAULT_PAGE_SIZE;
+  const take = DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * take;
 
-  // Build filters for DB, including stage in DB when possible
-  // Stage filter will be applied in-memory as a fallback (DB-side stage filtering is currently not supported by typing here)
+  const stageFilter = stage === 'none' 
+    ? { cadenceEngine: { is: null } }
+    : stage
+      ? { cadenceEngine: { currentStageOrder: parseInt(stage) } }
+      : undefined;
+
   const where = {
     profileId: profile.id,
     ...(search && {
@@ -92,34 +96,35 @@ const take = DEFAULT_PAGE_SIZE;
       ],
     }),
     ...(status && { status: status as LeadStatus }),
-    // stage filter applied in-memory below
+    ...(stageFilter && stageFilter),
   };
 
   try {
     const [leads, total] = await Promise.all([
-    prisma.lead.findMany({
-      where,
-      include: { 
-        histories: { orderBy: { createdAt: 'desc' }, take: 10 },
-        lastOperator: { select: { name: true } },
-        leadNotes: { 
-          include: { operator: { select: { name: true } } },
-          orderBy: { createdAt: 'desc' }, 
-          take: 10 
-        },
-        cadenceEngine: {
-          select: {
-            status: true,
-            currentStageOrder: true,
-            cadence: {
-              select: {
-                stages: {
-                  select: {
-                    order: true,
-                    channel: true,
-                    template: {
-                      select: {
-                        name: true
+      prisma.lead.findMany({
+        where,
+        include: { 
+          histories: { orderBy: { createdAt: 'desc' }, take: 10 },
+          lastOperator: { select: { name: true } },
+          leadNotes: { 
+            include: { operator: { select: { name: true } } },
+            orderBy: { createdAt: 'desc' }, 
+            take: 10 
+          },
+          cadenceEngine: {
+            select: {
+              status: true,
+              currentStageOrder: true,
+              cadence: {
+                select: {
+                  stages: {
+                    select: {
+                      order: true,
+                      channel: true,
+                      template: {
+                        select: {
+                          name: true
+                        }
                       }
                     }
                   }
@@ -127,29 +132,16 @@ const take = DEFAULT_PAGE_SIZE;
               }
             }
           }
-        }
-      },
-      orderBy: { updatedAt: 'desc' },
-      take,
-      skip,
-    }),
-    prisma.lead.count({ where }),
-  ]);
+        },
+        orderBy: { updatedAt: 'desc' },
+        take,
+        skip,
+      }),
+      prisma.lead.count({ where }),
+    ]);
 
-// Stage filtering fallback: apply stage filter in-memory if needed
-  let filteredLeads = leads;
-  if (stage) {
-    if (stage === 'none') {
-      filteredLeads = leads.filter((l: any) => !l.cadenceEngine);
-    } else {
-      const stageNum = parseInt(stage);
-      filteredLeads = leads.filter((l: any) => l.cadenceEngine?.currentStageOrder === stageNum);
-    }
-  }
-
-  const finalTotal = filteredLeads.length;
-  const finalTotalPages = Math.ceil(finalTotal / take);
-  return { leads: filteredLeads, total: finalTotal, page, totalPages: finalTotalPages };
+    const totalPages = Math.ceil(total / take);
+    return { leads, total, page, totalPages };
   } catch (error: any) {
     console.error('getLeads: Erro ao buscar leads:', error);
     return { 
