@@ -1,68 +1,127 @@
-import { Suspense } from 'react';
-import { Users } from 'lucide-react';
-import { getLeads } from '@/actions/leads';
-import { LeadsTableWrapper } from '@/features/leads/LeadsTableWrapper';
+'use client';
 
-interface LeadsPageProps {
-  searchParams: Promise<{ search?: string; status?: string; stage?: string; page?: string }>;
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Users, Loader2 } from 'lucide-react';
+import { LeadsTable } from '@/features/leads/LeadsTable';
+import { LeadFilters } from '@/features/leads/LeadFilters';
+import type { LeadWithHistory } from '@/features/leads/types';
+import type { Template } from '@prisma/client';
+
+interface LeadsData {
+  leads: LeadWithHistory[];
+  total: number;
+  totalPages: number;
+  error?: string;
 }
 
-export const metadata = {
-  title: 'Leads – LimpaLeads',
-  description: 'Gerencie seus contatos comerciais',
-};
-
-export default async function LeadsPage({ searchParams }: LeadsPageProps) {
-  // Extrair parâmetros com segurança
-  let page = 1;
-  let search = '';
-  let status = '';
-  let stage = '';
+export default function LeadsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   
-  try {
-    const params = await searchParams;
-    page = Number(params.page) || 1;
-    search = params.search || '';
-    status = params.status || '';
-    stage = params.stage || '';
-  } catch (e) {
-    console.error('Erro ao extrair params:', e);
-    // Continua com valores padrão
-  }
+  // Estado
+  const [leads, setLeads] = useState<LeadWithHistory[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Buscar leads com tratamento de erro robusto
-  let result: any = { leads: [], total: 0, totalPages: 1, error: null };
-  
-  try {
-    result = await getLeads({ page, search, status, stage });
-  } catch (e: any) {
-    console.error('Erro ao buscar leads:', e);
-    result = { 
-      leads: [], 
-      total: 0, 
-      totalPages: 1, 
-      error: e?.message || 'Erro desconhecido' 
+  // Obter parâmetros da URL
+  const getUrlParams = () => {
+    return {
+      search: searchParams.get('search') || '',
+      status: searchParams.get('status') || '',
+      stage: searchParams.get('stage') || '',
+      page: parseInt(searchParams.get('page') || '1'),
     };
-  }
+  };
 
-  // Se houve erro na busca, mostrar mensagem
-  if (result.error) {
+  // Carregar dados do servidor
+  const loadLeads = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { getLeads } = await import('@/actions/leads');
+      const { getTemplates } = await import('@/actions/templates');
+      
+      const params = getUrlParams();
+      
+      // Carregar leads e templates em paralelo
+      const [leadsResult, templatesResult] = await Promise.all([
+        getLeads({ page: params.page, search: params.search, status: params.status, stage: params.stage }),
+        getTemplates().catch(() => [])
+      ]);
+      
+      if (leadsResult.error) {
+        setError(leadsResult.error);
+        setLeads([]);
+        setTotal(0);
+        setTotalPages(1);
+      } else {
+        setLeads(leadsResult.leads || []);
+        setTotal(leadsResult.total || 0);
+        setTotalPages(leadsResult.totalPages || 1);
+      }
+      
+      setTemplates(Array.isArray(templatesResult) ? templatesResult : []);
+      setCurrentPage(params.page);
+      
+    } catch (err: any) {
+      console.error('Erro ao carregar leads:', err);
+      setError(err?.message || 'Erro ao carregar dados');
+      setLeads([]);
+      setTotal(0);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Carregar ao iniciar e quando URL mudar
+  useEffect(() => {
+    loadLeads();
+  }, [searchParams.toString()]);
+
+  // Handler de mudança de página
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', String(newPage));
+    router.push(`/leads?${params.toString()}`);
+  };
+
+  // Se está carregando
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-extrabold text-slate-900">Leads</h1>
-        <div className="bg-white rounded-2xl border border-red-200 p-8 flex flex-col items-center justify-center text-center">
-          <p className="text-red-600 font-medium mb-4">{result.error}</p>
-          <p className="text-slate-500 text-sm">Se o problema persistir, faça login novamente.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 h-64 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
         </div>
       </div>
     );
   }
-  
-  // Garantir que leads é sempre um array válido
-  const safeLeads = Array.isArray(result.leads) ? result.leads : [];
-  const safeTotal = typeof result.total === 'number' ? result.total : 0;
-  const safeTotalPages = typeof result.totalPages === 'number' ? result.totalPages : 1;
 
+  // Se houve erro
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-extrabold text-slate-900">Leads</h1>
+        <div className="bg-white rounded-2xl border border-red-200 p-8 flex flex-col items-center justify-center text-center">
+          <p className="text-red-600 font-medium mb-4">{error}</p>
+          <button 
+            onClick={loadLeads}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render normal
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -80,31 +139,34 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         </div>
       </div>
 
-      {/* Filtros - carregados dinamicamente */}
-      <Suspense fallback={null}>
-        <LeadFiltersLazy />
-      </Suspense>
+      {/* Filtros */}
+      <LeadFilters />
 
       {/* Tabela */}
-      <Suspense fallback={
-        <div className="bg-white rounded-2xl border border-slate-200 h-64 flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      }>
-        <LeadsTableWrapper
-          initialLeads={safeLeads}
-          initialTotal={safeTotal}
-          initialPage={page}
-          initialTotalPages={safeTotalPages}
-          templates={[]}
-        />
-      </Suspense>
+      <LeadsTable
+        leads={leads}
+        total={total}
+        page={currentPage}
+        totalPages={totalPages}
+        templates={templates}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 }
 
-// Componente de filtros carregado separadamente para evitar problemas de SSR
-async function LeadFiltersLazy() {
-  const { LeadFilters } = await import('@/features/leads/LeadFilters');
-  return <LeadFilters />;
+// Wrapper com Suspense para o useSearchParams
+export function LeadsPageWithSuspense() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <h1 className="text-2xl font-extrabold text-slate-900">Leads</h1>
+        <div className="bg-white rounded-2xl border border-slate-200 h-64 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        </div>
+      </div>
+    }>
+      <LeadsPage />
+    </Suspense>
+  );
 }
