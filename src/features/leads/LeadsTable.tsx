@@ -8,6 +8,8 @@ import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { LeadForm } from './LeadForm';
+import { LeadEditModal } from '@/components/shared/LeadEditModal';
+import { useLeadStore } from '@/lib/stores/lead-store';
 import { deleteLead, deleteAllLeads } from '@/actions/leads';
 import { formatDate, formatDateTime, getLinkedinProfileUrl, getGmailComposeUrl, cn } from '@/lib/utils';
 import { ContactActionModal } from './ContactActionModal';
@@ -37,7 +39,6 @@ interface LeadsTableProps {
 export function LeadsTable({ leads, total, page, totalPages, templates, onPageChange, hasMore, onLoadMore, isLoadingMore, isRefreshing: externalRefreshing, filtersActive }: LeadsTableProps) {
   const router = useRouter();
   const [isRefreshingInternal, setIsRefreshingInternal] = useState(false);
-  const [editingLead, setEditingLead] = useState<LeadWithHistory | null>(null);
   const [creating, setCreating] = useState(false);
   const [contactModal, setContactModal] = useState<{ isOpen: boolean; lead: LeadWithHistory | null; channel: TemplateChannel }>({ 
     isOpen: false, lead: null, channel: 'LINKEDIN' 
@@ -50,6 +51,12 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   const [selectedStageForBulk, setSelectedStageForBulk] = useState<string>('');
   const [isBulkUpdatingStage, setIsBulkUpdatingStage] = useState(false);
   const { activeOperator } = useOperator();
+
+  // Usa Zustand store para edição (sincronizado com Agenda)
+  const { selectedLeadId, isEditModalOpen, openLeadEditor, closeLeadEditor, leads: storeLeads } = useLeadStore();
+
+  // Encontra o lead selecionado nos leads locais
+  const editingLead = storeLeads.find(l => l.id === selectedLeadId) || null;
 
   // Combina estados de refreshing (interno + externo)
   const isRefreshing = isRefreshingInternal || externalRefreshing || false;
@@ -451,7 +458,7 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
-                            onClick={() => setEditingLead(lead)}
+                            onClick={() => openLeadEditor(lead.id)}
                             className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors"
                             title="Editar"
                           >
@@ -530,7 +537,13 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
 
       {/* Modais */}
       {creating && <LeadForm onClose={() => setCreating(false)} />}
-      {editingLead && <LeadForm lead={editingLead} onClose={() => setEditingLead(null)} />}
+
+      {/* Modal de edição compartilhado (Zustand) */}
+      <LeadEditModal
+        lead={editingLead}
+        isOpen={isEditModalOpen}
+        onClose={closeLeadEditor}
+      />
 
       <ContactActionModal
         isOpen={contactModal.isOpen}

@@ -7,12 +7,17 @@ import {
   Mail,
   PauseCircle,
   ArrowRight,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { LeadActionDrawer } from './LeadActionDrawer';
+import { LeadEditModal } from '@/components/shared/LeadEditModal';
+import { useLeadStore } from '@/lib/stores/lead-store';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface AgendaListProps {
   initialLeads: any[];
@@ -23,23 +28,56 @@ interface AgendaListProps {
 }
 
 export function AgendaList({ initialLeads, totalPending, templates, isLoading, stageFilter }: AgendaListProps) {
+  const router = useRouter();
+  const { openLeadEditor, setLeads } = useLeadStore();
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [displayedLeads, setDisplayedLeads] = useState(initialLeads);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(totalPending > initialLeads.length);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingLeadData, setEditingLeadData] = useState<any | null>(null);
 
-  // Atualiza displayedLeads quando initialLeads mudar (por causa do filtro)
+  // Popula o store com leads da agenda para edição compartilhada
   const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
   if (initialLeads !== prevInitialLeads) {
     setDisplayedLeads(initialLeads);
     setPrevInitialLeads(initialLeads);
     setHasMore(totalPending > initialLeads.length);
+    // Converte lead da agenda para formato LeadWithHistory
+    const storeLeads = initialLeads.map((l: any) => ({
+      ...l.lead,
+      histories: [],
+      lastOperator: null,
+      leadNotes: [],
+      cadenceEngine: {
+        status: l.status,
+        currentStageOrder: l.currentStageOrder,
+        cadence: { stages: l.cadence?.stages || [] }
+      }
+    }));
+    setLeads(storeLeads);
   }
 
   const handleOpenAction = (lead: any) => {
     setSelectedLead(lead);
     setIsDrawerOpen(true);
+  };
+
+  const handleEditLead = (lead: any) => {
+    // Abre modal de edição inline na agenda
+    setEditingLeadData({
+      ...lead.lead,
+      histories: [],
+      lastOperator: null,
+      leadNotes: [],
+      cadenceEngine: {
+        status: lead.status,
+        currentStageOrder: lead.currentStageOrder,
+        cadence: { stages: lead.cadence?.stages || [] }
+      }
+    });
+    setIsEditOpen(true);
   };
 
   async function loadMoreLeads() {
@@ -149,8 +187,15 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
 
               <div className="flex items-center gap-3">
                 <button 
+                  onClick={(e) => { e.stopPropagation(); handleEditLead(lead); }}
+                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  title="Editar lead"
+                >
+                  <Pencil className="w-5 h-5" />
+                </button>
+                <button 
                   onClick={(e) => { e.stopPropagation(); }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all"
+                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <PauseCircle className="w-5 h-5" />
                 </button>
@@ -211,6 +256,18 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
         leadProgress={selectedLead}
         templates={templates}
       />
+
+      {/* Modal de Edição Inline */}
+      {editingLeadData && (
+        <LeadEditModal
+          lead={editingLeadData}
+          isOpen={isEditOpen}
+          onClose={() => {
+            setIsEditOpen(false);
+            setEditingLeadData(null);
+          }}
+        />
+      )}
     </div>
   );
 }
