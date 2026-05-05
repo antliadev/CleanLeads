@@ -30,15 +30,74 @@ export type LeadFormResult = { success: boolean; error?: string };
 // Utilitários de normalização
 // ═══════════════════════
 /**
- * Normaliza texto para busca: remove acentos e caracteres especiais
- * Usado para garantir correspondência entre busca sem acento e dados com acento no banco
+ * Normaliza texto para busca no banco:
+ * - Converte para lowercase
+ * - Remove acentos (João → Joao, JOÃO → joao)
  */
-function normalizeForSearch(text: string): string {
+function normalizeText(text: string): string {
   return text
+    .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos (acentos)
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Extrai o primeiro nome de uma string de nome completo
+ */
+function extractFirstName(fullName: string): string {
+  if (!fullName) return '';
+  // Remove acentos primeiro
+  const normalized = normalizeText(fullName);
+  // Pega o primeiro nome (até o primeiro espaço)
+  return normalized.split(' ')[0];
+}
+
+/**
+ * Cria condições de busca robustas para um lead
+ * Inclui: nome completo, primeiro nome, company, email, jobTitle, phone
+ * Funciona com: acentos, case, partial match
+ */
+function buildSearchConditions(search: string) {
+  if (!search || search.trim().length < 1) return undefined;
+  
+  const term = search.trim();
+  const normalizedTerm = normalizeText(term);
+  const firstName = extractFirstName(term);
+  
+  // Todos os campos possíveis para busca
+  const fields = ['fullName', 'company', 'email', 'jobTitle', 'phone'];
+  
+  // Condições para cada campo
+  const conditions: any[] = [];
+  
+  for (const field of fields) {
+    // 1. Contains exato (case-insensitive) - encontra "joão" em "João Silva"
+    conditions.push({ [field]: { contains: term, mode: 'insensitive' as const } });
+    
+    // 2. Contains normalizado (sem acentos) - encontra "joao" em "João Silva"
+    if (normalizedTerm !== term.toLowerCase()) {
+      conditions.push({ [field]: { contains: normalizedTerm, mode: 'insensitive' as const } });
+    }
+    
+    // 3. StartsWith (início do nome) - encontra "Jo" em "João Silva"
+    // Só aplica para fullName e company (nomes e empresas)
+    if (field === 'fullName' || field === 'company') {
+      conditions.push({ [field]: { startsWith: term, mode: 'insensitive' as const } });
+      conditions.push({ [field]: { startsWith: normalizedTerm, mode: 'insensitive' as const } });
+    }
+  }
+  
+  // 4. Busca pelo primeiro nome no campo fullName
+  // "Joao" encontra "João Silva" (primeiro nome)
+  if (firstName && firstName.length >= 2) {
+    conditions.push({ fullName: { startsWith: firstName, mode: 'insensitive' as const } });
+    // Primeiro nome em maiúsculas também
+    conditions.push({ fullName: { startsWith: firstName.toUpperCase(), mode: 'insensitive' as const } });
+  }
+  
+  return conditions.length > 0 ? conditions : undefined;
 }
 
 // ═══════════════════════
@@ -95,28 +154,8 @@ export async function getLeads({
   const take = DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * take;
 
-  // Normaliza o termo de busca para encontrar correspondências com/sem acentos
-  const normalizedSearch = search ? normalizeForSearch(search) : '';
-  
-  // Se há termo de busca, pesquisamos em ambos os formatos (original e normalizado)
-  // para garantir que "Joao" encontre "João" e vice-versa
-  const searchConditions = search 
-    ? [
-        // Busca exata (case-insensitive)
-        { fullName: { contains: search, mode: 'insensitive' as const } },
-        { company: { contains: search, mode: 'insensitive' as const } },
-        { email: { contains: search, mode: 'insensitive' as const } },
-        { jobTitle: { contains: search, mode: 'insensitive' as const } },
-        { phone: { contains: search, mode: 'insensitive' as const } },
-        // Busca normalizada (sem acentos) - encontra "Joao" em "João"
-        ...(normalizedSearch !== search ? [
-          { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
-          { company: { contains: normalizedSearch, mode: 'insensitive' as const } },
-          { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
-          { jobTitle: { contains: normalizedSearch, mode: 'insensitive' as const } },
-        ] : [])
-      ]
-    : undefined;
+  // Usa as novas condições de busca inteligentes
+  const searchConditions = buildSearchConditions(search);
 
   const stageFilter = stage === 'none' 
     ? { cadenceEngine: { is: null } }
@@ -126,7 +165,6 @@ export async function getLeads({
 
   const where = {
     profileId: profile.id,
-    // Usa searchConditions que incluye búsqueda normalizada y campos adicionales
     ...(searchConditions && { OR: searchConditions }),
     ...(status && { status: status as LeadStatus }),
     ...(stageFilter && stageFilter),

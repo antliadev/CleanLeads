@@ -27,12 +27,6 @@ export function LeadFilters() {
   
   // Estado local para o input (busca manual)
   const [localSearch, setLocalSearch] = useState(currentSearch);
-  const normalizeSearch = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
 
   // Sincroniza o localSearch quando a URL mudar
   useEffect(() => {
@@ -59,8 +53,8 @@ export function LeadFilters() {
   };
 
   const handleSearch = () => {
-    const normalized = normalizeSearch(localSearch);
-    updateUrl({ search: normalized });
+    // Envia texto original - o back-end faz toda a lógica de normalização
+    updateUrl({ search: localSearch.trim() });
   };
 
   const clearAll = () => {
