@@ -2,139 +2,160 @@
 
 import { useRouter } from 'next/navigation';
 import { Search, X, Loader2 } from 'lucide-react';
-import { useTransition, useState, useEffect, useCallback } from 'react';
+import { useTransition, useState, useEffect, useRef, useCallback } from 'react';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /**
- * Filtros da página de Leads — busca MANUAL.
- * - Busca dispara APENAS ao clicar na lupa ou pressionar Enter
- * - Campo de texto atualiza apenas estado local (sem debounce automático)
- * - Limpar filtros restaura todos os leads
- * - Busca via server action com normalização de acentos no backend
+ * Filtros da página de Leads.
+ *
+ * Comportamento de busca (texto):
+ *  - Auto-search: debounce 300ms ao digitar (mín. 2 chars) — dispara server search
+ *  - Manual: clicar na lupa ou pressionar Enter dispara imediatamente
+ *  - Limpar (X no campo): reseta busca de texto e recarrega todos os leads
+ *
+ * Filtros de Status e Estágio disparam imediatamente ao mudar o select.
+ *
+ * Normalização e busca fuzzy são feitas no backend (Prisma + PostgreSQL).
  */
 export function LeadFilters() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Lê parâmetros da URL de forma segura (SSR-safe)
-  const getParams = () => {
-    if (typeof window === 'undefined') {
-      return { search: '', status: '', stage: '' };
-    }
-    const params = new URLSearchParams(window.location.search);
+  // ─── Lê URL atual (SSR-safe) ────────────────────────────────────────────────
+  const getUrlParams = () => {
+    if (typeof window === 'undefined') return { search: '', status: '', stage: '' };
+    const p = new URLSearchParams(window.location.search);
     return {
-      search: params.get('search') || '',
-      status: params.get('status') || '',
-      stage: params.get('stage') || '',
+      search: p.get('search') || '',
+      status: p.get('status') || '',
+      stage:  p.get('stage')  || '',
     };
   };
 
-  const { search: currentSearch, status: currentStatus, stage: currentStage } = getParams();
+  const { search: urlSearch, status: urlStatus, stage: urlStage } = getUrlParams();
 
-  // Estado local do campo de texto — só atualiza a URL ao submeter
-  const [localSearch, setLocalSearch] = useState(currentSearch);
+  // Estado local do campo — atualiza sem ir ao servidor
+  const [localSearch, setLocalSearch] = useState(urlSearch);
 
-  // Indica que o campo tem texto diferente da busca ativa na URL
-  const hasPendingSearch = localSearch.trim() !== currentSearch.trim();
-
-  // Sincroniza localSearch quando a URL muda (navegação, popstate, Limpar)
+  // Sincroniza campo quando URL muda externamente (ex: botão Limpar, popstate)
   useEffect(() => {
-    setLocalSearch(currentSearch);
-  }, [currentSearch]);
+    setLocalSearch(urlSearch);
+  }, [urlSearch]);
 
-  // Atualiza parâmetros da URL sem tocar em outros filtros existentes
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
   const updateUrl = useCallback(
     (newParams: Record<string, string>) => {
       const params = new URLSearchParams(window.location.search);
-
-      Object.entries(newParams).forEach(([key, value]) => {
-        if (value) {
-          params.set(key, value);
-        } else {
-          params.delete(key);
-        }
+      Object.entries(newParams).forEach(([k, v]) => {
+        v ? params.set(k, v) : params.delete(k);
       });
-
-      params.delete('page'); // reseta paginação sempre que filtros mudam
-
-      startTransition(() => {
-        router.push(`/leads?${params.toString()}`);
-      });
+      params.delete('page'); // reseta paginação ao filtrar
+      startTransition(() => router.push(`/leads?${params.toString()}`));
     },
     [router]
   );
 
-  // Dispara a busca — só chamado ao submeter o formulário
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+
+  // onChange: atualiza campo local + dispara busca automática (debounce 300ms)
+  const handleInputChange = (value: string) => {
+    setLocalSearch(value);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(() => {
+      if (value.trim().length >= 2) {
+        updateUrl({ search: value.trim() });
+      } else if (value.trim() === '') {
+        updateUrl({ search: '' }); // campo vazio → remove filtro
+      }
+    }, 300);
+  };
+
+  // Limpa o campo de texto e remove filtro de busca da URL
+  const handleClearSearch = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setLocalSearch('');
+    updateUrl({ search: '' });
+  };
+
+  // Enter ou click na lupa → busca imediata (cancela debounce pendente)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     updateUrl({ search: localSearch.trim() });
   };
 
-  // Limpa todos os filtros e volta ao estado inicial
+  // Limpa TODOS os filtros e volta à lista completa
   const clearAll = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setLocalSearch('');
-    startTransition(() => {
-      router.push('/leads');
-    });
+    startTransition(() => router.push('/leads'));
   };
 
-  const hasFilters = currentSearch || currentStatus || currentStage;
+  const hasFilters = urlSearch || urlStatus || urlStage;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-3">
-      {/* Campo de busca — manual */}
+
+      {/* ── Campo de busca ──────────────────────────────────────────────────── */}
       <div className="relative flex-1 min-w-[280px] max-w-sm">
         <input
           id="lead-search-input"
           type="text"
           value={localSearch}
-          onChange={(e) => setLocalSearch(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           placeholder="Buscar por nome, empresa, e-mail..."
+          autoComplete="off"
           className={cn(
-            'w-full pl-4 pr-12 py-2.5 border rounded-xl text-sm shadow-sm transition-all',
+            'w-full pl-4 pr-20 py-2.5 border rounded-xl text-sm shadow-sm transition-all',
             'text-slate-900 dark:text-slate-50 bg-white dark:bg-slate-900',
             'focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500',
-            // Destaca a borda quando há texto pendente (diferente da URL)
-            hasPendingSearch && !isPending
-              ? 'border-indigo-400 dark:border-indigo-500'
-              : 'border-slate-200 dark:border-slate-800',
+            'border-slate-200 dark:border-slate-800',
             isPending && 'opacity-60'
           )}
           aria-label="Buscar leads"
-          autoComplete="off"
         />
 
-        {/* Botão lupa — único gatilho de busca */}
+        {/* Botão limpar texto (X) — só aparece quando há texto no campo */}
+        {localSearch && (
+          <button
+            type="button"
+            onClick={handleClearSearch}
+            className="absolute right-10 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-slate-300 hover:text-slate-500 transition-colors"
+            title="Limpar busca"
+            tabIndex={-1}
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Botão lupa — busca imediata ao clicar */}
         <button
           id="lead-search-button"
           type="submit"
           disabled={isPending}
           className={cn(
             'absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8',
-            'flex items-center justify-center rounded-lg transition-all',
-            'disabled:opacity-50',
-            // Destaque quando há texto pendente para o usuário saber que pode clicar
-            hasPendingSearch && !isPending
-              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100'
-              : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30',
-            isPending && 'animate-pulse'
+            'flex items-center justify-center rounded-lg transition-all disabled:opacity-50',
+            isPending
+              ? 'text-indigo-600 animate-pulse'
+              : 'text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30'
           )}
-          title="Pesquisar (ou pressione Enter)"
+          title="Pesquisar (Enter)"
         >
-          {isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Search className="w-4 h-4" />
-          )}
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
         </button>
       </div>
 
-      {/* Filtro de Status — imediato (sem necessidade de clicar em buscar) */}
+      {/* ── Filtro de Status ────────────────────────────────────────────────── */}
       <select
         id="lead-status-filter"
-        value={currentStatus}
+        value={urlStatus}
         onChange={(e) => updateUrl({ status: e.target.value })}
+        disabled={isPending}
         className={cn(
           'border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5',
           'text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 shadow-sm transition-colors',
@@ -148,11 +169,12 @@ export function LeadFilters() {
         ))}
       </select>
 
-      {/* Filtro de Estágio — imediato */}
+      {/* ── Filtro de Estágio ───────────────────────────────────────────────── */}
       <select
         id="lead-stage-filter"
-        value={currentStage}
+        value={urlStage}
         onChange={(e) => updateUrl({ stage: e.target.value })}
+        disabled={isPending}
         className={cn(
           'border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5',
           'text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 shadow-sm transition-colors',
@@ -170,13 +192,14 @@ export function LeadFilters() {
         <option value="6">Passo 6 - E-mail</option>
       </select>
 
-      {/* Botão Limpar — visível quando há qualquer filtro ativo na URL */}
+      {/* ── Botão Limpar todos os filtros ──────────────────────────────────── */}
       {hasFilters && (
         <button
           id="lead-clear-filters"
           type="button"
           onClick={clearAll}
-          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50"
+          disabled={isPending}
+          className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-bold text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50 disabled:opacity-50"
         >
           <X className="w-4 h-4" />
           Limpar

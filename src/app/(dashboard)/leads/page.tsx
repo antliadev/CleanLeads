@@ -5,6 +5,9 @@ import { getTemplates } from '@/actions/templates';
 import { LeadsTableWrapper } from '@/features/leads/LeadsTableWrapper';
 import { LeadFilters } from '@/features/leads/LeadFilters';
 
+// Desabilita cache para garantir que searchParams sempre chegam frescos ao servidor
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Leads – LimpaLeads',
   description: 'Gerencie seus contatos comerciais',
@@ -69,6 +72,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
             </div>
           }>
             <LeadsTableWrapper
+              key={`${search}|${status}|${stage}|${page}`}
               initialLeads={safeLeads}
               initialTotal={safeTotal}
               initialPage={page}
