@@ -27,6 +27,21 @@ const leadSchema = z.object({
 export type LeadFormResult = { success: boolean; error?: string };
 
 // ═══════════════════════
+// Utilitários de normalização
+// ═══════════════════════
+/**
+ * Normaliza texto para busca: remove acentos e caracteres especiais
+ * Usado para garantir correspondência entre busca sem acento e dados com acento no banco
+ */
+function normalizeForSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacríticos (acentos)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ═══════════════════════
 // Listar leads com filtros
 // ═══════════════════════
 export async function getLeads({
@@ -80,6 +95,29 @@ export async function getLeads({
   const take = DEFAULT_PAGE_SIZE;
   const skip = (page - 1) * take;
 
+  // Normaliza o termo de busca para encontrar correspondências com/sem acentos
+  const normalizedSearch = search ? normalizeForSearch(search) : '';
+  
+  // Se há termo de busca, pesquisamos em ambos os formatos (original e normalizado)
+  // para garantir que "Joao" encontre "João" e vice-versa
+  const searchConditions = search 
+    ? [
+        // Busca exata (case-insensitive)
+        { fullName: { contains: search, mode: 'insensitive' as const } },
+        { company: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search, mode: 'insensitive' as const } },
+        { jobTitle: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search, mode: 'insensitive' as const } },
+        // Busca normalizada (sem acentos) - encontra "Joao" em "João"
+        ...(normalizedSearch !== search ? [
+          { fullName: { contains: normalizedSearch, mode: 'insensitive' as const } },
+          { company: { contains: normalizedSearch, mode: 'insensitive' as const } },
+          { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+          { jobTitle: { contains: normalizedSearch, mode: 'insensitive' as const } },
+        ] : [])
+      ]
+    : undefined;
+
   const stageFilter = stage === 'none' 
     ? { cadenceEngine: { is: null } }
     : stage
@@ -88,13 +126,8 @@ export async function getLeads({
 
   const where = {
     profileId: profile.id,
-    ...(search && {
-      OR: [
-        { fullName: { contains: search, mode: 'insensitive' as const } },
-        { company: { contains: search, mode: 'insensitive' as const } },
-        { email: { contains: search, mode: 'insensitive' as const } },
-      ],
-    }),
+    // Usa searchConditions que incluye búsqueda normalizada y campos adicionales
+    ...(searchConditions && { OR: searchConditions }),
     ...(status && { status: status as LeadStatus }),
     ...(stageFilter && stageFilter),
   };
