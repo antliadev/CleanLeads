@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
 import type { Template } from '@prisma/client';
 import type { LeadWithHistory } from './types';
+import { useLeadStore } from '@/lib/stores/lead-store';
 
 interface LeadsTableWrapperProps {
   initialLeads: LeadWithHistory[];
@@ -31,6 +32,9 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Zustand store para edição de leads
+  const { setLeads: syncLeadsToStore } = useLeadStore();
+
   // ─── CORREÇÃO CRÍTICA ───────────────────────────────────────────────────────
   // Em Next.js App Router, navegações soft (router.push) re-renderizam o
   // Server Component e passam novas props, mas o Client Component NÃO
@@ -38,12 +42,16 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
   // A key dinâmica em page.tsx já garante o remount, mas este Effect é o
   // fallback de segurança para edge cases.
   useEffect(() => {
-    setLeads(Array.isArray(initialLeads) ? initialLeads : []);
+    const safeLeadsArray = Array.isArray(initialLeads) ? initialLeads : [];
+    setLeads(safeLeadsArray);
     setTotal(typeof initialTotal === 'number' ? initialTotal : 0);
     setCurrentPage(initialPage);
     setHasMore(initialPage < initialTotalPages);
     setError(null);
-  }, [initialLeads, initialTotal, initialPage, initialTotalPages]);
+    
+    // Sincroniza com store para permitir edição via modal
+    syncLeadsToStore(safeLeadsArray);
+  }, [initialLeads, initialTotal, initialPage, initialTotalPages, syncLeadsToStore]);
 
 
   // Escuta mudanças na URL via popstate
