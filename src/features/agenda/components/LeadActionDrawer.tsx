@@ -78,19 +78,30 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
   // Filtra templates por canal selecionado
   const filteredTemplates = (templates || []).filter(t => t.channel === selectedChannel && t.isActive);
 
-  // Inicializa o template quando o canal muda
+  // Inicializa o template quando o canal muda ou o lead abre
   useEffect(() => {
-    if (isOpen && filteredTemplates.length > 0 && !selectedTemplateId) {
-      setSelectedTemplateId(filteredTemplates[0].id);
-    } else if (isOpen && filteredTemplates.length > 0 && selectedTemplateId) {
-      // Garante que o template selecionado ainda é válido para o canal
-      if (!filteredTemplates.find(t => t.id === selectedTemplateId)) {
+    if (!isOpen) return;
+
+    const currentStageTemplateId = currentStage?.templateId;
+    const stageTemplate = currentStageTemplateId ? filteredTemplates.find(t => t.id === currentStageTemplateId) : null;
+
+    if (filteredTemplates.length > 0) {
+      // Prioridade 1: Template vinculado ao estágio (se corresponder ao canal selecionado)
+      if (stageTemplate) {
+        setSelectedTemplateId(stageTemplate.id);
+      } 
+      // Prioridade 2: Manter seleção atual se ainda for válida para o canal
+      else if (selectedTemplateId && filteredTemplates.find(t => t.id === selectedTemplateId)) {
+        // Não faz nada, mantém o selecionado
+      }
+      // Prioridade 3: Primeiro template disponível no canal
+      else {
         setSelectedTemplateId(filteredTemplates[0].id);
       }
     } else {
       setSelectedTemplateId(null);
     }
-  }, [isOpen, selectedChannel]);
+  }, [isOpen, selectedChannel, leadProgress?.id, currentStage?.templateId]);
 
   const selectedTemplate = filteredTemplates.find(t => t.id === selectedTemplateId);
 
@@ -528,13 +539,16 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
         </motion.div>
 
         {/* Modal de Contato (mesma experiência da lista de leads) */}
-        <ContactActionModal
-          isOpen={contactModalOpen}
-          onClose={() => setContactModalOpen(false)}
-          lead={leadProgress.lead}
-          channel={selectedChannel as TemplateChannel}
-          templates={templates || []}
-        />
+        {leadProgress?.lead && (
+          <ContactActionModal
+            isOpen={contactModalOpen}
+            onClose={() => setContactModalOpen(false)}
+            lead={leadProgress.lead}
+            channel={selectedChannel as TemplateChannel}
+            templates={templates || []}
+            defaultTemplateId={selectedTemplateId}
+          />
+        )}
       </div>
     </AnimatePresence>
   );

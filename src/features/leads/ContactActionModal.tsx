@@ -19,6 +19,7 @@ interface ContactActionModalProps {
   lead: LeadWithHistory | null;
   channel: TemplateChannel;
   templates: Template[];
+  defaultTemplateId?: string | null;
 }
 
 export function ContactActionModal({
@@ -27,6 +28,7 @@ export function ContactActionModal({
   lead,
   channel,
   templates,
+  defaultTemplateId,
 }: ContactActionModalProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [compiledSubject, setCompiledSubject] = useState('');
@@ -58,16 +60,19 @@ export function ContactActionModal({
   // Estabilidade: quando o modal abre ou muda de canal, reinicia o estado
   useEffect(() => {
     if (!isOpen) return;
-    // Reseta seleção para o primeiro template do canal atual
-    const firstTemplate = activeTemplates[0];
-    setSelectedTemplateId(firstTemplate?.id ?? '');
+    
+    // Prioriza o templateId padrão se ele existir nos templates ativos deste canal
+    const preferredTemplate = defaultTemplateId ? activeTemplates.find(t => t.id === defaultTemplateId) : null;
+    const initialTemplate = preferredTemplate || activeTemplates[0];
+    
+    setSelectedTemplateId(initialTemplate?.id ?? '');
     setCopied(false);
     setView('PREPARATION');
     setPendingStatus(null);
     setNote('');
     setIsUpdatingStatus(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, channel]);
+  }, [isOpen, channel, defaultTemplateId]);
 
   // Listener para capturar o retorno do usuário à aba após abrir link externo
   useEffect(() => {
@@ -152,9 +157,25 @@ export function ContactActionModal({
     setView('WAITING');
   };
 
-  const handleStatusSelect = (status: LeadStatus) => {
+  const handleStatusSelect = async (status: LeadStatus) => {
+    if (isUpdatingStatus || !lead) return;
+    
     setPendingStatus(status);
-    setView('FOLLOWUP_QUESTION');
+    
+    // Se for um status de confirmação rápida, pula a pergunta de anotação
+    if (status === 'AGUARDANDO_RETORNO' || status === 'CONTATADO') {
+      setIsUpdatingStatus(true);
+      try {
+        await updateLeadStatus(lead.id, status, activeOperator?.id || '');
+        onClose();
+      } catch (err) {
+        console.error('Erro ao atualizar status automaticamente:', err);
+      } finally {
+        setIsUpdatingStatus(false);
+      }
+    } else {
+      setView('FOLLOWUP_QUESTION');
+    }
   };
 
   const handleFinishWithoutNote = async () => {
