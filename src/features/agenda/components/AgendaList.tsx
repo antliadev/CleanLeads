@@ -185,30 +185,27 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
 
               <div className="space-y-1 min-w-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Próxima Ação</p>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1 text-sm">
-                  {/* Linha principal: ícone + tempo restante */}
-                  <div className="flex items-center gap-2">
-                    <Clock className={`w-3.5 h-3.5 shrink-0 ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`} />
-                    <span className={`font-bold whitespace-nowrap ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`}>
-                      {lead.nextActionPrimary || lead.timeDisplay || 'Pronto'}
-                    </span>
-                  </div>
-                  {/* Linha secundária: data + horário (para ações futuras que não são hoje/amanhã) */}
-                  {lead.nextActionSecondary && (
-                    <span className="text-slate-500 text-xs font-medium truncate">
-                      • {lead.nextActionSecondary} • {lead.nextActionTime}
-                    </span>
-                  )}
-                  {/* Para hoje: mostrar "Hoje às Xh" junto com o tempo restante */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 text-sm">
+                  {/* Tempo restante - menor, sem destaque */}
+                  <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                    {lead.nextActionPrimary || lead.timeDisplay || 'Pronto'}
+                  </span>
+                  {/* Separador */}
+                  <span className="text-slate-300">•</span>
+                  {/* Data/horário em destaque azul */}
                   {lead.nextActionIsToday && lead.nextActionTime && (
-                    <span className="text-slate-500 text-xs font-medium">
-                      • Hoje às {lead.nextActionTime}
+                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
+                      Hoje, {lead.nextActionTime}
                     </span>
                   )}
-                  {/* Para amanhã: mostrar "Amanhã às Xh" junto com o tempo restante */}
                   {lead.nextActionIsTomorrow && lead.nextActionTime && (
-                    <span className="text-slate-500 text-xs font-medium">
-                      • Amanhã às {lead.nextActionTime}
+                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
+                      Amanhã, {lead.nextActionTime}
+                    </span>
+                  )}
+                  {lead.nextActionSecondary && lead.nextActionTime && !lead.nextActionIsToday && !lead.nextActionIsTomorrow && (
+                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
+                      {lead.nextActionSecondary} • {lead.nextActionTime}
                     </span>
                   )}
                 </div>
