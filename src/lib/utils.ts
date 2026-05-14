@@ -57,6 +57,42 @@ export function getWeekdayName(date: string | Date): string {
 }
 
 /**
+ * Verifica se a data cai no fim de semana (sábado ou domingo).
+ */
+function isWeekend(date: Date): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 6; // domingo = 0, sábado = 6
+}
+
+/**
+ * Retorna a segunda-feira seguinte caso a data caia no fim de semana.
+ */
+function getNextBusinessDay(date: Date): Date {
+  const d = new Date(date);
+  while (isWeekend(d)) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+/**
+ * Calcula a diferença em dias e horas entre duas datas, ignorando o horário.
+ */
+function getDateDiff(start: Date, end: Date): { days: number; hours: number; mins: number } {
+  // Normaliza para meia-noite
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  
+  const diffMs = endDay.getTime() - startDay.getTime();
+  const totalHours = Math.abs(diffMs) / (1000 * 60 * 60);
+  const days = Math.floor(totalHours / 24);
+  const hours = Math.floor(totalHours % 24);
+  const mins = Math.floor((totalHours * 60) % 60);
+  
+  return { days, hours, mins };
+}
+
+/**
  * Formata data no padrão brasileiro (dd/MM).
  */
 export function formatDateShort(date: string | Date): string {
@@ -68,13 +104,13 @@ export function formatDateShort(date: string | Date): string {
 
 /**
  * Formata a exibição completa da próxima ação para a agenda de leads.
- * Retorna um objeto com todas as informações para exibição.
+ * Se a data agendada cair no fim de semana, exibe a segunda-feira seguinte.
  * 
  * Formatos:
- * - Futuro: "Falta 2d 3h • 15/05, sexta-feira • 18h"
- * - Hoje: "Hoje às 18h • Falta 3h"
- * - Amanhã: "Amanhã às 18h • Falta 1d"
- * - Vencida: "Vencida há 4h • Prevista para 14/05, quinta-feira • 18h"
+ * - Futuro: "Falta 2d 3h • 15/05, sexta-feira"
+ * - Hoje: "Falta 3h • Hoje"
+ * - Amanhã: "Falta 1d • Amanhã"
+ * - Vencida: "Vencida há 4h • 14/05, quinta-feira"
  */
 export function formatNextActionDisplay(nextScheduledAt: string | Date | null): {
   primary: string;        // Texto principal (ex: "Falta 2d 3h")
@@ -97,52 +133,53 @@ export function formatNextActionDisplay(nextScheduledAt: string | Date | null): 
 
   const now = new Date();
   const scheduled = new Date(nextScheduledAt);
+
+  // Se a data agendada cai no fim de semana, move para segunda-feira
+  const displayDate = isWeekend(scheduled) ? getNextBusinessDay(scheduled) : scheduled;
+
+  // Verifica se a data original já venceu
   const isOverdue = scheduled < now;
 
-  // Cálculo do tempo restante/atrasado
-  const diffMs = Math.abs(now.getTime() - scheduled.getTime());
-  const diffHours = diffMs / (1000 * 60 * 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const remainingHours = Math.floor(diffHours % 24);
-  const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  // Calcula diferença em dias/horas usando a data de exibição (dia a dia, sem horário)
+  const { days, hours, mins } = getDateDiff(now, displayDate);
 
   // Verifica se é hoje, amanhã ou vencida
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const scheduledDay = new Date(scheduled.getFullYear(), scheduled.getMonth(), scheduled.getDate());
-  const isToday = scheduledDay.getTime() === today.getTime();
+  const displayDay = new Date(displayDate.getFullYear(), displayDate.getMonth(), displayDate.getDate());
+  const isToday = displayDay.getTime() === today.getTime();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const isTomorrow = scheduledDay.getTime() === tomorrow.getTime();
+  const isTomorrow = displayDay.getTime() === tomorrow.getTime();
 
   // Formata data e horário
-  const dateShort = formatDateShort(scheduled);
-  const weekday = getWeekdayName(scheduled);
-  const timeFormatted = formatTime(scheduled);
+  const dateShort = formatDateShort(displayDate);
+  const weekday = getWeekdayName(displayDate);
+  const timeFormatted = formatTime(displayDate);
 
-  // Constrói o texto principal
+  // Constrói o texto principal (tempo restante)
   let primary: string;
   if (isOverdue) {
-    if (diffDays > 0) {
-      primary = `Vencida há ${diffDays}d ${remainingHours}h`;
-    } else if (remainingHours > 0) {
-      primary = `Vencida há ${remainingHours}h ${remainingMins}m`;
+    if (days > 0) {
+      primary = `Vencida há ${days}d ${hours}h`;
+    } else if (hours > 0) {
+      primary = `Vencida há ${hours}h ${mins}m`;
     } else {
-      primary = `Vencida há ${remainingMins}m`;
+      primary = `Vencida há ${mins}m`;
     }
   } else {
-    if (diffDays > 0) {
-      primary = `Falta ${diffDays}d ${remainingHours}h`;
-    } else if (remainingHours > 0) {
-      primary = `Falta ${remainingHours}h ${remainingMins}m`;
+    if (days > 0) {
+      primary = `Falta ${days}d ${hours}h`;
+    } else if (hours > 0) {
+      primary = `Falta ${hours}h ${mins}m`;
     } else {
-      primary = `Falta ${remainingMins}m`;
+      primary = `Falta ${mins}m`;
     }
   }
 
-  // Constrói texto secundário
+  // Constrói texto secundário (data formatada)
   let secondary: string;
   if (isOverdue) {
-    secondary = `Prevista para ${dateShort}, ${weekday}`;
+    secondary = `${dateShort}, ${weekday}`;
   } else if (isToday) {
     secondary = '';
   } else if (isTomorrow) {
