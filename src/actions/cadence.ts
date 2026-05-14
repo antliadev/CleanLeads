@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { CadenceStatus, TemplateChannel } from '@prisma/client';
 import { getAuthProfile } from './auth';
+import { formatNextActionDisplay } from '@/lib/utils';
 
 /**
  * TRAVA LEAD: Reserva o lead para um operador por 5 minutos
@@ -87,41 +88,23 @@ export async function getAgendaLeads({ stageFilter }: { stageFilter?: number } =
 const leads = entries.map((entry: any) => {
     const currentStage = entry.cadence.stages.find((s: any) => s.order === entry.currentStageOrder);
     const isOverdue = entry.nextScheduledAt < now;
-    
-    // Cálculo de tempo para UI (残り時間 ou tempo atrasado)
-    let timeDisplay = null;
-    const diffMs = now.getTime() - new Date(entry.nextScheduledAt).getTime();
-    const diffHours = Math.abs(diffMs) / (1000 * 60 * 60);
-    const diffDays = Math.floor(diffHours / 24);
-    const remainingHours = Math.floor(diffHours % 24);
-    const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (isOverdue) {
-      // Atrasado - mostrar tempo passado
-      if (diffDays > 0) {
-        timeDisplay = `${diffDays}d ${remainingHours}h atrasado`;
-      } else if (remainingHours > 0) {
-        timeDisplay = `${remainingHours}h ${remainingMins}m atrasado`;
-      } else {
-        timeDisplay = `${remainingMins}m atrasado`;
-      }
-    } else {
-      // No prazo - mostrar tempo restante
-      if (diffDays > 0) {
-        timeDisplay = `${diffDays}d ${remainingHours}h`;
-      } else if (remainingHours > 0) {
-        timeDisplay = `${remainingHours}h ${remainingMins}m`;
-      } else {
-        timeDisplay = `${remainingMins}m`;
-      }
-    }
+
+    // Usa a função utilitária para formatar a exibição completa da próxima ação
+    const nextActionDisplay = formatNextActionDisplay(entry.nextScheduledAt);
 
     return {
       ...entry,
       currentStage,
       isOverdue,
-      timeDisplay,
-      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000)
+      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000),
+      // Novos campos para exibição melhorada
+      nextActionPrimary: nextActionDisplay.primary,
+      nextActionSecondary: nextActionDisplay.secondary,
+      nextActionTime: nextActionDisplay.time,
+      nextActionIsToday: nextActionDisplay.isToday,
+      nextActionIsTomorrow: nextActionDisplay.isTomorrow,
+      // Mantém o timeDisplay antigo para compatibilidade (será removido após transição)
+      timeDisplay: nextActionDisplay.primary,
     };
   });
 
@@ -216,39 +199,23 @@ export async function getAgendaLeadsMore(skip: number, stageFilter?: number) {
   const leads = entries.map((entry: any) => {
     const currentStage = entry.cadence.stages.find((s: any) => s.order === entry.currentStageOrder);
     const isOverdue = entry.nextScheduledAt < now;
-    
-    // Cálculo de tempo para UI (残り時間 ou tempo atrasado)
-    let timeDisplay = null;
-    const diffMs = now.getTime() - new Date(entry.nextScheduledAt).getTime();
-    const diffHours = Math.abs(diffMs) / (1000 * 60 * 60);
-    const diffDays = Math.floor(diffHours / 24);
-    const remainingHours = Math.floor(diffHours % 24);
-    const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (isOverdue) {
-      if (diffDays > 0) {
-        timeDisplay = `${diffDays}d ${remainingHours}h atrasado`;
-      } else if (remainingHours > 0) {
-        timeDisplay = `${remainingHours}h ${remainingMins}m atrasado`;
-      } else {
-        timeDisplay = `${remainingMins}m atrasado`;
-      }
-    } else {
-      if (diffDays > 0) {
-        timeDisplay = `${diffDays}d ${remainingHours}h`;
-      } else if (remainingHours > 0) {
-        timeDisplay = `${remainingHours}h ${remainingMins}m`;
-      } else {
-        timeDisplay = `${remainingMins}m`;
-      }
-    }
+
+    // Usa a função utilitária para formatar a exibição completa da próxima ação
+    const nextActionDisplay = formatNextActionDisplay(entry.nextScheduledAt);
 
     return {
       ...entry,
       currentStage,
       isOverdue,
-      timeDisplay,
-      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000)
+      isExtremeUrgent: isOverdue && (now.getTime() - new Date(entry.nextScheduledAt).getTime() > 4 * 60 * 60 * 1000),
+      // Novos campos para exibição melhorada
+      nextActionPrimary: nextActionDisplay.primary,
+      nextActionSecondary: nextActionDisplay.secondary,
+      nextActionTime: nextActionDisplay.time,
+      nextActionIsToday: nextActionDisplay.isToday,
+      nextActionIsTomorrow: nextActionDisplay.isTomorrow,
+      // Mantém o timeDisplay antigo para compatibilidade (será removido após transição)
+      timeDisplay: nextActionDisplay.primary,
     };
   });
 

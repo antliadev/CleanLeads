@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useCallback } from 'react';
 import { CalendarDays, X } from 'lucide-react';
 import { getAgendaLeads, getStageCounts } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
@@ -25,7 +25,30 @@ export function AgendaPageClient({
   const [selectedStage, setSelectedStage] = useState<number | null>(null);
   const [leads, setLeads] = useState(initialLeads);
   const [totalPending, setTotalPending] = useState(initialTotalPending);
+  const [stages, setStages] = useState(initialStages);
+  const [totalActive, setTotalActive] = useState(initialTotalActive);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Função para recarregar todos os dados da agenda
+  const refreshAgenda = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Busca dados atualizados em paralelo
+      const [leadsResult, stagesResult] = await Promise.all([
+        getAgendaLeads({ stageFilter: selectedStage || undefined }),
+        getStageCounts()
+      ]);
+      
+      setLeads(leadsResult.leads);
+      setTotalPending(leadsResult.totalPending);
+      setStages(stagesResult.stages);
+      setTotalActive(stagesResult.totalActive);
+    } catch (error) {
+      console.error('Erro ao atualizar agenda:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedStage]);
 
   const handleStageClick = async (stageOrder: number) => {
     const newStage = selectedStage === stageOrder ? null : stageOrder;
@@ -91,8 +114,8 @@ export function AgendaPageClient({
 
       {/* Painel de Estágios com clique */}
       <AgendaStagePanel 
-        stages={initialStages} 
-        totalActive={initialTotalActive}
+        stages={stages} 
+        totalActive={totalActive}
         selectedStage={selectedStage}
         onStageClick={handleStageClick}
       />
@@ -137,6 +160,7 @@ export function AgendaPageClient({
           totalPending={totalPending}
           templates={initialTemplates}
           isLoading={isLoading}
+          onActionComplete={refreshAgenda}
         />
       </Suspense>
     </div>

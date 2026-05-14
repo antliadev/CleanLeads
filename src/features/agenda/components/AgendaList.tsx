@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { 
   Clock, 
   AlertCircle, 
@@ -25,9 +25,10 @@ interface AgendaListProps {
   templates: any[];
   isLoading?: boolean;
   stageFilter?: number | null;
+  onActionComplete?: () => void;
 }
 
-export function AgendaList({ initialLeads, totalPending, templates, isLoading, stageFilter }: AgendaListProps) {
+export function AgendaList({ initialLeads, totalPending, templates, isLoading, stageFilter, onActionComplete }: AgendaListProps) {
   const router = useRouter();
   const { openLeadEditor, setLeads } = useLeadStore();
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
@@ -37,6 +38,13 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
   const [hasMore, setHasMore] = useState(totalPending > initialLeads.length);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingLeadData, setEditingLeadData] = useState<any | null>(null);
+
+  // Callback para quando uma ação for concluída
+  const handleActionComplete = useCallback(() => {
+    if (onActionComplete) {
+      onActionComplete();
+    }
+  }, [onActionComplete]);
 
   // Popula o store com leads da agenda para edição compartilhada
   const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
@@ -175,13 +183,34 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
                 </div>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Próxima Ação</p>
-                <div className="flex items-center gap-2 text-sm font-bold">
-                  <Clock className={`w-3.5 h-3.5 ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`} />
-                  <span className={lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}>
-                    {lead.timeDisplay || 'Pronto'}
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-x-3 gap-y-1 text-sm">
+                  {/* Linha principal: ícone + tempo restante */}
+                  <div className="flex items-center gap-2">
+                    <Clock className={`w-3.5 h-3.5 shrink-0 ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`} />
+                    <span className={`font-bold whitespace-nowrap ${lead.isOverdue ? 'text-rose-500' : 'text-indigo-500'}`}>
+                      {lead.nextActionPrimary || lead.timeDisplay || 'Pronto'}
+                    </span>
+                  </div>
+                  {/* Linha secundária: data + horário (para ações futuras que não são hoje/amanhã) */}
+                  {lead.nextActionSecondary && (
+                    <span className="text-slate-500 text-xs font-medium truncate">
+                      • {lead.nextActionSecondary} • {lead.nextActionTime}
+                    </span>
+                  )}
+                  {/* Para hoje: mostrar "Hoje às Xh" junto com o tempo restante */}
+                  {lead.nextActionIsToday && lead.nextActionTime && (
+                    <span className="text-slate-500 text-xs font-medium">
+                      • Hoje às {lead.nextActionTime}
+                    </span>
+                  )}
+                  {/* Para amanhã: mostrar "Amanhã às Xh" junto com o tempo restante */}
+                  {lead.nextActionIsTomorrow && lead.nextActionTime && (
+                    <span className="text-slate-500 text-xs font-medium">
+                      • Amanhã às {lead.nextActionTime}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -255,6 +284,7 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
         onClose={() => setIsDrawerOpen(false)} 
         leadProgress={selectedLead}
         templates={templates}
+        onActionComplete={handleActionComplete}
       />
 
       {/* Modal de Edição Inline */}

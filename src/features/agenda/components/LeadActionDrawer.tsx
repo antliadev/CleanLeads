@@ -33,9 +33,10 @@ interface LeadActionDrawerProps {
   onClose: () => void;
   leadProgress: any | null;
   templates: any[];
+  onActionComplete?: () => void;
 }
 
-export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: LeadActionDrawerProps) {
+export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates, onActionComplete }: LeadActionDrawerProps) {
   const [activeTab, setActiveTab] = useState<'ACTION' | 'NOTES' | 'HISTORY'>('ACTION');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,6 +142,10 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
       });
       toast.success('Ação registrada com sucesso!');
       onClose();
+      // Dispara callback para atualizar a agenda após ação concluída
+      if (onActionComplete) {
+        onActionComplete();
+      }
     } catch (error: any) {
       if (error.message.includes('CONCURRENCY_ERROR')) {
         toast.error('Este lead já foi atualizado por outro operador.');
@@ -481,6 +486,10 @@ export function LeadActionDrawer({ isOpen, onClose, leadProgress, templates }: L
                               else await resumeLeadCadence(leadProgress.id, activeOperator.id);
                               toast.success(btn.id === 'PAUSED' ? 'Cadência pausada.' : 'Cadência retomada.');
                               onClose();
+                              // Atualiza agenda após pausar/retomar
+                              if (onActionComplete) {
+                                onActionComplete();
+                              }
                             } catch (e: any) {
                               toast.error('Erro ao alterar status da cadência.');
                             } finally {

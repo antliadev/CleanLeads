@@ -33,6 +33,135 @@ export function formatDateTime(date: string | Date): string {
 }
 
 /**
+ * Formata horário (hora e minutos) no padrão brasileiro, retornando apenas horas sem os minutos quando são 00.
+ * Ex: "18:00" retorna "18h", "14:30" retorna "14h30"
+ */
+export function formatTime(date: string | Date): string {
+  const d = new Date(date);
+  const hours = d.getHours();
+  const minutes = d.getMinutes();
+  
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  
+  return `${hours}h${minutes.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Retorna o dia da semana por extenso em português.
+ */
+export function getWeekdayName(date: string | Date): string {
+  const weekdays = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+  return weekdays[new Date(date).getDay()];
+}
+
+/**
+ * Formata data no padrão brasileiro (dd/MM).
+ */
+export function formatDateShort(date: string | Date): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(date));
+}
+
+/**
+ * Formata a exibição completa da próxima ação para a agenda de leads.
+ * Retorna um objeto com todas as informações para exibição.
+ * 
+ * Formatos:
+ * - Futuro: "Falta 2d 3h • 15/05, sexta-feira • 18h"
+ * - Hoje: "Hoje às 18h • Falta 3h"
+ * - Amanhã: "Amanhã às 18h • Falta 1d"
+ * - Vencida: "Vencida há 4h • Prevista para 14/05, quinta-feira • 18h"
+ */
+export function formatNextActionDisplay(nextScheduledAt: string | Date | null): {
+  primary: string;        // Texto principal (ex: "Falta 2d 3h")
+  secondary: string;      // Data e dia (ex: "15/05, sexta-feira")
+  time: string;           // Horário (ex: "18h")
+  isOverdue: boolean;     // Se está vencida
+  isToday: boolean;       // Se é hoje
+  isTomorrow: boolean;   // Se é amanhã
+} {
+  if (!nextScheduledAt) {
+    return {
+      primary: 'Pronto',
+      secondary: '',
+      time: '',
+      isOverdue: false,
+      isToday: false,
+      isTomorrow: false,
+    };
+  }
+
+  const now = new Date();
+  const scheduled = new Date(nextScheduledAt);
+  const isOverdue = scheduled < now;
+
+  // Cálculo do tempo restante/atrasado
+  const diffMs = Math.abs(now.getTime() - scheduled.getTime());
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = Math.floor(diffHours % 24);
+  const remainingMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+  // Verifica se é hoje, amanhã ou vencida
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const scheduledDay = new Date(scheduled.getFullYear(), scheduled.getMonth(), scheduled.getDate());
+  const isToday = scheduledDay.getTime() === today.getTime();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = scheduledDay.getTime() === tomorrow.getTime();
+
+  // Formata data e horário
+  const dateShort = formatDateShort(scheduled);
+  const weekday = getWeekdayName(scheduled);
+  const timeFormatted = formatTime(scheduled);
+
+  // Constrói o texto principal
+  let primary: string;
+  if (isOverdue) {
+    if (diffDays > 0) {
+      primary = `Vencida há ${diffDays}d ${remainingHours}h`;
+    } else if (remainingHours > 0) {
+      primary = `Vencida há ${remainingHours}h ${remainingMins}m`;
+    } else {
+      primary = `Vencida há ${remainingMins}m`;
+    }
+  } else {
+    if (diffDays > 0) {
+      primary = `Falta ${diffDays}d ${remainingHours}h`;
+    } else if (remainingHours > 0) {
+      primary = `Falta ${remainingHours}h ${remainingMins}m`;
+    } else {
+      primary = `Falta ${remainingMins}m`;
+    }
+  }
+
+  // Constrói texto secundário
+  let secondary: string;
+  if (isOverdue) {
+    secondary = `Prevista para ${dateShort}, ${weekday}`;
+  } else if (isToday) {
+    secondary = '';
+  } else if (isTomorrow) {
+    secondary = '';
+  } else {
+    secondary = `${dateShort}, ${weekday}`;
+  }
+
+  return {
+    primary,
+    secondary,
+    time: timeFormatted,
+    isOverdue,
+    isToday,
+    isTomorrow,
+  };
+}
+
+/**
  * Normaliza e retorna a URL real do LinkedIn de um lead.
  * Regras:
  * - Usa apenas o link real cadastrado (linkedinUrl) — nunca constrói URL a partir do nome.
