@@ -192,20 +192,20 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
                   </span>
                   {/* Separador */}
                   <span className="text-slate-300">•</span>
-                  {/* Data/horário em destaque azul */}
-                  {lead.nextActionIsToday && lead.nextActionTime && (
+                  {/* Data em destaque azul */}
+                  {lead.nextActionIsToday && (
                     <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      Hoje, {lead.nextActionTime}
+                      Hoje
                     </span>
                   )}
-                  {lead.nextActionIsTomorrow && lead.nextActionTime && (
+                  {lead.nextActionIsTomorrow && (
                     <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      Amanhã, {lead.nextActionTime}
+                      Amanhã
                     </span>
                   )}
-                  {lead.nextActionSecondary && lead.nextActionTime && !lead.nextActionIsToday && !lead.nextActionIsTomorrow && (
+                  {lead.nextActionSecondary && !lead.nextActionIsToday && !lead.nextActionIsTomorrow && (
                     <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      {lead.nextActionSecondary} • {lead.nextActionTime}
+                      {lead.nextActionSecondary}
                     </span>
                   )}
                 </div>
