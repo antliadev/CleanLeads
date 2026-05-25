@@ -5,7 +5,7 @@ import { AgendaPageClient } from './AgendaPageClient';
 
 export default async function AgendaPage() {
   // Lê o operador ativo do cookie para filtrar as contagens iniciais
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const operatorId = cookieStore.get('limpaleads_operator_id')?.value;
 
   const [
