@@ -1,0 +1,125 @@
+# CleanLeads Mind Map (MB)
+#
+# This mind map documents the project: context, architecture and functionalities,
+# based on the current repository contents (Next.js app with Prisma + PostgreSQL and Supabase).
+#
+Root: CleanLeads
+  Contexto
+    Descrição: Sistema de gestão de leads com cadência de contatos (drip campaigns),
+    gerenciamento de templates, histórico, notas, e notificações, com perfis de usuário.
+  Arquitetura de Alto Nível
+    Frontend
+      - Next.js 16 App Router
+      - React 19.x (observado no package.json)
+      - Tailwind CSS
+      - Geist font (via next/font)
+      - Componentização com Zustand para estado local
+      - Integração com Supabase para autenticação/real-time SSR
+      - Bibliotecas: Framer Motion, Recharts, Papaparse, xlsx, date-fns
+    Backend / Data
+      - Prisma ORM com PostgreSQL
+      - Gerenciamento de migrations via Prisma (prisma migrate deploy)
+      - Modelos: Profile, Lead, CadenceEngine, CadenceStage, LeadCadenceProgress, LeadCadenceEvent, Template, LeadHistory, Operator, LeadNote, Notification
+      - Fonte de dados: PostgreSQL (driver pg)
+    Infra / Deploy
+      - Vercel recomendado para deploy (documentação)
+      - Supabase como alternativa/integração de DB/Auth
+  Tecnologias-chave
+    - Next.js, Prisma, PostgreSQL, Supabase, Zustand, Tailwind, Framer Motion, Recharts, XLSX, PapaParse
+  Modelos de Dados (principais entidades)
+    Profile
+      - id: UUID
+      - authUid: único (auth_uid)
+      - name, email (único)
+      - createdAt, updatedAt
+      - relações: leads, templates, operators, cadences, notifications
+      - map: profiles
+    Lead
+      - id: UUID
+      - profileId (FK)
+      - code (unique, cuid)
+      - fullName (nome completo)
+      - status: LeadStatus (NOVO etc.)
+      - source: LeadSource (MANUAL, CSV, XLSX)
+      - fields opcionais: company, jobTitle, email, phone, etc.
+      - relations: profile, lastOperator, histories, leadNotes, cadenceEngine
+      - indexes: profileId, lastOperatorId, status, source, createdAt
+      - map: leads
+    CadenceEngine
+      - id, profileId, name, description, isActive
+      - relations: profile, stages, progressions
+    CadenceStage
+      - id, cadenceId, order, channel, delayDays, templateId
+      - relations: cadence, template
+    LeadCadenceProgress
+      - id, profileId, leadId, cadenceId
+      - currentStageOrder, nextStageOrder
+      - status
+      - nextScheduledAt, lastActionAt, pausedAt, finishedAt
+      - lockedAt, lockedBy
+      - relations: lead, cadence
+      - map: lead_cadence_progress
+    LeadCadenceEvent
+      - id, leadCadenceProgressId, leadId, action, fromStage, toStage, operatorId, notes, createdAt
+      - progression relation
+    Template
+      - id, profileId, name, channel, subject, body, isActive
+      - relations: profile, cadenceStages
+    LeadHistory
+      - id, leadId, previousData(Json), newData(Json), actionBy, createdAt
+      - lead relation
+    Operator
+      - id, profileId, name, isActive
+      - relations: profile, leads, leadNotes
+    LeadNote
+      - id, leadId, operatorId, content, createdAt, updatedAt
+      - relations: lead, operator
+    Notification
+      - id, profileId, leadId, title, message, isRead, type, metadata, createdAt, updatedAt
+      - profile relation
+  Enums e Domínios de Negócio
+    LeadStatus: NOVO, AGUARDANDO_CONEXAO, AGUARDANDO_RETORNO, CONTATADO, EM_NEGOCIACAO, CONVERTIDO, PERDIDO, PAUSADO
+    LeadSource: MANUAL, IMPORTACAO_CSV, IMPORTACAO_XLSX
+    TemplateChannel: EMAIL, LINKEDIN, WHATSAPP
+    CadenceStatus: ACTIVE, PAUSED, FINISHED, CANCELED, REPLIED
+  Funcionalidades Principais
+    1. Gestão de Perfis (Profile)
+       - Criar/Editar Perfil; associar autenticação com authUid
+       - Gerenciar Leads, Templates, Operators, Cadences, Notificações
+    2. Gestão de Leads
+       - Criar/Editar Lead com dados obrigatórios (fullName) e opcionais (email, phone, company, etc.)
+       - Associar a um Profile
+       - Atribuir e acompanhar status (NOVO, CONTATADO, etc.)
+       - Registros de Histórias (LeadHistory) para mudanças de dados
+       - Notas (LeadNote) por operadores
+    3. Importação de Leads
+       - Suporte para CSV/XLSX (LeadSource)
+    4. Cadência de Contato (Cadence)
+       - CadenceEngine representa sequência de etapas de contato
+       - CadenceStage define etapas com canal (EMAIL/LINKEDIN/WHATSAPP), atraso em dias, template
+       - LeadCadenceProgress monitora o progresso de cada Lead pela Cadence
+       - Eventos de cadência (LeadCadenceEvent) registram transitions e ações
+    5. Templates e Mensagens
+       - Template com body, subject e channel; ligado a Profile
+       - Associado a CadenceStage para envio de mensagens
+    6. Notificações
+       - Notificações por perfil para ações de cadência ou eventos
+    7. Operadores e Notas
+       - Operadores vinculados a Perfil; notas de Lead associadas a operadores
+  Fluxos de Lógica (logica de negócio)
+    - Criação de Lead: cria lead com status inicial NOVO; associa a Profile
+    - Progresso de Cadência: LeadCadenceProgress armazena currentStageOrder; nextScheduledAt para envio
+    - Transições: LeadCadenceEvent registra fromStage/toStage e ações de operador
+    - Fechamento de Cadência: status FINISHED ou CANCELED com logs de conclusão
+  Consultas e Operações
+    - Prisma ORM facilita operações CRUD para todas as entidades
+    - Seeds/migrations com Prisma Migrate
+    - Operações de importação/exportação (Papaparse, XLSX)
+  Observabilidade e Deploy
+    - Next.js com Vercel/Next hosting
+    - Supabase para autenticação/DB, SSR
+    - Prisma para modelo de dados e migrations
+  Observações de Segurança e BO
+    - Profile.authUid mapeia usuário autenticado
+    - Campos sensíveis não explicitamente criptografados nos modelos; plano de melhoria
+  This Map é um resumo técnico do estado atual do projeto

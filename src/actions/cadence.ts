@@ -223,6 +223,83 @@ export async function getAgendaLeadsMore(skip: number, stageFilter?: number) {
 }
 
 /**
+ * CONTAGEM DE AÇÕES PENDENTES PARA A AGENDA OPERACIONAL
+ * Retorna os totais de ações pendentes considerando o fuso horário America/Sao_Paulo.
+ * 
+ * - todayCount: ações com nextScheduledAt <= fim do dia atual (inclui vencidas + hoje)
+ * - overdueCount: ações com nextScheduledAt < início do dia atual (apenas vencidas)
+ * - totalPending: total de ações ativas não finalizadas
+ * 
+ * Aceita filtros opcionais por estágio (stageFilter) e operador (operatorId).
+ */
+export async function getAgendaCounts({
+  stageFilter,
+  operatorId,
+}: { stageFilter?: number; operatorId?: string } = {}) {
+  const profile = await getAuthProfile();
+  if (!profile) throw new Error('Não autorizado');
+
+  const now = new Date();
+
+  // Define início e fim do dia no fuso America/Sao_Paulo
+  const brasiliaOffset = -3 * 60; // -180 minutos
+  const localOffset = now.getTimezoneOffset(); // offset local do servidor
+  const diff = brasiliaOffset - localOffset;
+
+  const brasiliaNow = new Date(now.getTime() + diff * 60 * 1000);
+
+  const startOfToday = new Date(
+    brasiliaNow.getFullYear(),
+    brasiliaNow.getMonth(),
+    brasiliaNow.getDate(),
+    0, 0, 0, 0
+  );
+
+  const endOfToday = new Date(
+    brasiliaNow.getFullYear(),
+    brasiliaNow.getMonth(),
+    brasiliaNow.getDate(),
+    23, 59, 59, 999
+  );
+
+  // Converte de volta para UTC para comparar com nextScheduledAt (armazenado em UTC)
+  const startOfTodayUtc = new Date(startOfToday.getTime() - diff * 60 * 1000);
+  const endOfTodayUtc = new Date(endOfToday.getTime() - diff * 60 * 1000);
+
+  const whereBase: any = {
+    profileId: profile.id,
+    status: 'ACTIVE',
+    finishedAt: null,
+  };
+
+  if (stageFilter) {
+    whereBase.currentStageOrder = stageFilter;
+  }
+
+  if (operatorId) {
+    whereBase.lead = { lastOperatorId: operatorId };
+  }
+
+  const [todayCount, overdueCount, totalPending] = await Promise.all([
+    prisma.leadCadenceProgress.count({
+      where: {
+        ...whereBase,
+        nextScheduledAt: { lte: endOfTodayUtc },
+      },
+    }),
+    prisma.leadCadenceProgress.count({
+      where: {
+        ...whereBase,
+        nextScheduledAt: { lt: startOfTodayUtc },
+      },
+    }),
+    prisma.leadCadenceProgress.count({ where: whereBase }),
+  ]);
+
+  return { todayCount, overdueCount, totalPending };
+}
+
+/**
  * EXECUTA ESTÁGIO: Avança o lead na cadência
  */
 export async function advanceCadenceStage(props: {

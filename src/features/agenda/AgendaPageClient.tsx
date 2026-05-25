@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense, useState, useCallback } from 'react';
+import { Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { CalendarDays, X } from 'lucide-react';
-import { getAgendaLeads, getStageCounts } from '@/actions/cadence';
+import { getAgendaLeads, getStageCounts, getAgendaCounts } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
+import { useOperator } from '@/components/providers/OperatorProvider';
 import { AgendaList } from '@/features/agenda/components/AgendaList';
 import { AgendaStagePanel } from '@/features/agenda/components/AgendaStagePanel';
 
@@ -13,6 +14,8 @@ interface AgendaPageClientProps {
   initialTemplates: any[];
   initialStages: any[];
   initialTotalActive: number;
+  initialTodayCount: number;
+  initialOverdueCount: number;
 }
 
 export function AgendaPageClient({ 
@@ -20,35 +23,56 @@ export function AgendaPageClient({
   initialTotalPending, 
   initialTemplates, 
   initialStages,
-  initialTotalActive 
+  initialTotalActive,
+  initialTodayCount,
+  initialOverdueCount,
 }: AgendaPageClientProps) {
   const [selectedStage, setSelectedStage] = useState<number | null>(null);
   const [leads, setLeads] = useState(initialLeads);
   const [totalPending, setTotalPending] = useState(initialTotalPending);
   const [stages, setStages] = useState(initialStages);
   const [totalActive, setTotalActive] = useState(initialTotalActive);
+  const [todayCount, setTodayCount] = useState(initialTodayCount);
+  const [overdueCount, setOverdueCount] = useState(initialOverdueCount);
   const [isLoading, setIsLoading] = useState(false);
+  const { activeOperator } = useOperator();
 
   // Função para recarregar todos os dados da agenda
   const refreshAgenda = useCallback(async () => {
     setIsLoading(true);
     try {
       // Busca dados atualizados em paralelo
-      const [leadsResult, stagesResult] = await Promise.all([
+      const [leadsResult, stagesResult, countsResult] = await Promise.all([
         getAgendaLeads({ stageFilter: selectedStage || undefined }),
-        getStageCounts()
+        getStageCounts(),
+        getAgendaCounts({ 
+          stageFilter: selectedStage || undefined,
+          operatorId: activeOperator?.id 
+        }),
       ]);
       
       setLeads(leadsResult.leads);
       setTotalPending(leadsResult.totalPending);
       setStages(stagesResult.stages);
       setTotalActive(stagesResult.totalActive);
+      setTodayCount(countsResult.todayCount);
+      setOverdueCount(countsResult.overdueCount);
     } catch (error) {
       console.error('Erro ao atualizar agenda:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedStage]);
+  }, [selectedStage, activeOperator?.id]);
+
+  // Recalcula contagens ao trocar de operador
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    refreshAgenda();
+  }, [refreshAgenda]);
 
   const handleStageClick = async (stageOrder: number) => {
     const newStage = selectedStage === stageOrder ? null : stageOrder;
@@ -56,11 +80,17 @@ export function AgendaPageClient({
     setIsLoading(true);
     
     try {
-      const { leads: newLeads, totalPending: newTotal } = await getAgendaLeads({ 
-        stageFilter: newStage || undefined 
-      });
-      setLeads(newLeads);
-      setTotalPending(newTotal);
+      const [leadsResult, countsResult] = await Promise.all([
+        getAgendaLeads({ stageFilter: newStage || undefined }),
+        getAgendaCounts({ 
+          stageFilter: newStage || undefined,
+          operatorId: activeOperator?.id 
+        }),
+      ]);
+      setLeads(leadsResult.leads);
+      setTotalPending(leadsResult.totalPending);
+      setTodayCount(countsResult.todayCount);
+      setOverdueCount(countsResult.overdueCount);
     } catch (error) {
       console.error('Erro ao filtrar estágio:', error);
     } finally {
@@ -72,9 +102,14 @@ export function AgendaPageClient({
     setSelectedStage(null);
     setIsLoading(true);
     try {
-      const { leads: newLeads, totalPending: newTotal } = await getAgendaLeads({});
-      setLeads(newLeads);
-      setTotalPending(newTotal);
+      const [leadsResult, countsResult] = await Promise.all([
+        getAgendaLeads({}),
+        getAgendaCounts({ operatorId: activeOperator?.id }),
+      ]);
+      setLeads(leadsResult.leads);
+      setTotalPending(leadsResult.totalPending);
+      setTodayCount(countsResult.todayCount);
+      setOverdueCount(countsResult.overdueCount);
     } catch (error) {
       console.error('Erro ao limpar filtro:', error);
     } finally {
@@ -82,9 +117,9 @@ export function AgendaPageClient({
     }
   };
 
-  // Agrupamento para estatísticas rápidas
-  const overdueCount = leads.filter((l: any) => l.isOverdue).length;
-  const todayCount = leads.filter((l: any) => !l.isOverdue).length;
+  // Estatísticas dos cards vêm do servidor (getAgendaCounts)
+  // todayCount = ações com nextScheduledAt <= fim do dia (inclui vencidas + hoje)
+  // overdueCount = ações com nextScheduledAt < início do dia (apenas vencidas)
 
   const stats = [
     { label: 'Vencidos', value: overdueCount.toString().padStart(2, '0'), color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-950/20', borderColor: 'border-rose-100 dark:border-rose-900/30' },
