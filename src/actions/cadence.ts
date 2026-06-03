@@ -226,11 +226,17 @@ export async function getAgendaLeadsMore(skip: number, stageFilter?: number) {
  * CONTAGEM DE AÇÕES PENDENTES PARA A AGENDA OPERACIONAL
  * Retorna os totais de ações pendentes considerando o fuso horário America/Sao_Paulo.
  * 
- * - todayCount: ações com nextScheduledAt <= fim do dia atual (inclui vencidas + hoje)
- * - overdueCount: ações com nextScheduledAt < início do dia atual (apenas vencidas)
- * - totalPending: total de ações ativas não finalizadas
+ * Soma DOIS tipos de ações:
+ *   1. Ações automáticas de cadência (LeadCadenceProgress com status ACTIVE)
+ *   2. Ações manuais agendadas (LeadScheduledAction com status PENDING)
  * 
- * Aceita filtros opcionais por estágio (stageFilter) e operador (operatorId).
+ * - todayCount: ações com data <= fim do dia atual (inclui vencidas + hoje)
+ * - overdueCount: ações com data < início do dia atual (apenas vencidas)
+ * - totalPending: total de ações ativas/pendentes não finalizadas
+ * 
+ * Aceita filtros opcionais por estágio (stageFilter — só afeta cadência)
+ * e operador (operatorId — afeta cadência via lead.lastOperatorId e ações
+ * manuais via createdByOperatorId).
  */
 export async function getAgendaCounts({
   stageFilter,
@@ -262,42 +268,73 @@ export async function getAgendaCounts({
     23, 59, 59, 999
   );
 
-  // Converte de volta para UTC para comparar com nextScheduledAt (armazenado em UTC)
+  // Converte de volta para UTC para comparar com datas armazenadas em UTC
   const startOfTodayUtc = new Date(startOfToday.getTime() - diff * 60 * 1000);
   const endOfTodayUtc = new Date(endOfToday.getTime() - diff * 60 * 1000);
 
-  const whereBase: any = {
+  // ── CADÊNCIA AUTOMÁTICA ──────────────────────────────────
+  const whereBaseCadence: any = {
     profileId: profile.id,
     status: 'ACTIVE',
     finishedAt: null,
   };
 
   if (stageFilter) {
-    whereBase.currentStageOrder = stageFilter;
+    whereBaseCadence.currentStageOrder = stageFilter;
   }
 
   if (operatorId) {
-    whereBase.lead = { lastOperatorId: operatorId };
+    whereBaseCadence.lead = { lastOperatorId: operatorId };
   }
 
-  const [todayCount, overdueCount, totalPending] = await Promise.all([
+  // ── AÇÕES MANUAIS ────────────────────────────────────────
+  const whereBaseManual: any = {
+    profileId: profile.id,
+    status: 'PENDING',
+  };
+
+  if (operatorId) {
+    whereBaseManual.createdByOperatorId = operatorId;
+  }
+  // Nota: stageFilter não se aplica a ações manuais (não têm estágio de cadência)
+
+  const [
+    cadenceTodayCount,
+    cadenceOverdueCount,
+    cadenceTotalPending,
+    manualTodayCount,
+    manualOverdueCount,
+    manualTotalPending,
+  ] = await Promise.all([
+    // Cadência: hoje
     prisma.leadCadenceProgress.count({
-      where: {
-        ...whereBase,
-        nextScheduledAt: { lte: endOfTodayUtc },
-      },
+      where: { ...whereBaseCadence, nextScheduledAt: { lte: endOfTodayUtc } },
     }),
+    // Cadência: vencidos
     prisma.leadCadenceProgress.count({
-      where: {
-        ...whereBase,
-        nextScheduledAt: { lt: startOfTodayUtc },
-      },
+      where: { ...whereBaseCadence, nextScheduledAt: { lt: startOfTodayUtc } },
     }),
-    prisma.leadCadenceProgress.count({ where: whereBase }),
+    // Cadência: total
+    prisma.leadCadenceProgress.count({ where: whereBaseCadence }),
+    // Manual: hoje
+    prisma.leadScheduledAction.count({
+      where: { ...whereBaseManual, scheduledAt: { lte: endOfTodayUtc } },
+    }),
+    // Manual: vencidos
+    prisma.leadScheduledAction.count({
+      where: { ...whereBaseManual, scheduledAt: { lt: startOfTodayUtc } },
+    }),
+    // Manual: total
+    prisma.leadScheduledAction.count({ where: whereBaseManual }),
   ]);
 
-  return { todayCount, overdueCount, totalPending };
+  return {
+    todayCount: cadenceTodayCount + manualTodayCount,
+    overdueCount: cadenceOverdueCount + manualOverdueCount,
+    totalPending: cadenceTotalPending + manualTotalPending,
+  };
 }
+
 
 /**
  * EXECUTA ESTÁGIO: Avança o lead na cadência

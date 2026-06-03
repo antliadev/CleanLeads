@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "./generated/client"
 }
 
 datasource db {
@@ -14,11 +15,12 @@ model Profile {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  leads     Lead[]
-  templates Template[]
-  operators Operator[]
-  cadences  CadenceEngine[]
-  notifications Notification[]
+  leads                Lead[]
+  templates            Template[]
+  operators            Operator[]
+  cadences             CadenceEngine[]
+  notifications        Notification[]
+  scheduledActions     LeadScheduledAction[]
 
   @@map("profiles")
 }
@@ -43,10 +45,11 @@ model Lead {
   createdAt      DateTime   @default(now()) @map("created_at")
   updatedAt      DateTime   @updatedAt @map("updated_at")
 
-  profile      Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  lastOperator Operator?     @relation(fields: [lastOperatorId], references: [id], onDelete: SetNull)
-  histories    LeadHistory[]
-  leadNotes    LeadNote[]
+  profile          Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  lastOperator     Operator?             @relation(fields: [lastOperatorId], references: [id], onDelete: SetNull)
+  histories        LeadHistory[]
+  leadNotes        LeadNote[]
+  scheduledActions LeadScheduledAction[]
   
   // Nova relação de Cadência (Nomenclatura disruptiva para quebrar cache)
   cadenceEngine LeadCadenceProgress?
@@ -212,9 +215,11 @@ model Operator {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  leads     Lead[]
-  leadNotes LeadNote[]
+  profile                  Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  leads                    Lead[]
+  leadNotes                LeadNote[]
+  createdManualActions     LeadScheduledAction[] @relation("ManualActionCreatedBy")
+  completedManualActions   LeadScheduledAction[] @relation("ManualActionCompletedBy")
 
   @@index([profileId])
   @@map("operators")
@@ -253,4 +258,61 @@ model Notification {
   @@index([profileId])
   @@index([isRead])
   @@map("notifications")
+}
+
+// ═══════════════════════════════════════════════════════════
+// Ações Manuais Agendadas — independentes da cadência automática
+// ═══════════════════════════════════════════════════════════
+
+model LeadScheduledAction {
+  id                    String               @id @default(uuid())
+  profileId             String               @map("profile_id")
+  leadId                String               @map("lead_id")
+  title                 String
+  actionType            ManualActionType     @default(TAREFA) @map("action_type")
+  channel               ManualActionChannel? @map("channel")
+  notes                 String?
+  scheduledAt           DateTime             @map("scheduled_at")
+  status                ManualActionStatus   @default(PENDING)
+  createdByOperatorId   String?              @map("created_by_operator_id")
+  completedByOperatorId String?              @map("completed_by_operator_id")
+  completedAt           DateTime?            @map("completed_at")
+  completionNotes       String?              @map("completion_notes")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  profile               Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  lead                  Lead                 @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdByOperator     Operator?            @relation("ManualActionCreatedBy", fields: [createdByOperatorId], references: [id], onDelete: SetNull)
+  completedByOperator   Operator?            @relation("ManualActionCompletedBy", fields: [completedByOperatorId], references: [id], onDelete: SetNull)
+
+  @@index([profileId, status, scheduledAt])
+  @@index([leadId])
+  @@index([createdByOperatorId])
+  @@map("lead_scheduled_actions")
+}
+
+enum ManualActionType {
+  LIGACAO
+  REUNIAO
+  EMAIL
+  WHATSAPP
+  LINKEDIN
+  TAREFA
+}
+
+enum ManualActionChannel {
+  EMAIL
+  LINKEDIN
+  WHATSAPP
+  TELEFONE
+  PRESENCIAL
+  OUTRO
+}
+
+enum ManualActionStatus {
+  PENDING
+  DONE
+  CANCELED
+  MISSED
 }

@@ -1,12 +1,14 @@
 'use client';
 
 import { Suspense, useState, useCallback, useEffect, useRef } from 'react';
-import { CalendarDays, X } from 'lucide-react';
+import { CalendarDays, X, CalendarPlus } from 'lucide-react';
 import { getAgendaLeads, getStageCounts, getAgendaCounts } from '@/actions/cadence';
-import { getTemplates } from '@/actions/templates';
+import { getManualActions } from '@/actions/manual-actions';
 import { useOperator } from '@/components/providers/OperatorProvider';
 import { AgendaList } from '@/features/agenda/components/AgendaList';
 import { AgendaStagePanel } from '@/features/agenda/components/AgendaStagePanel';
+import { ScheduleActionModal } from '@/features/agenda/components/ScheduleActionModal';
+import type { ManualAgendaItem } from '@/types/agenda';
 
 interface AgendaPageClientProps {
   initialLeads: any[];
@@ -16,6 +18,8 @@ interface AgendaPageClientProps {
   initialTotalActive: number;
   initialTodayCount: number;
   initialOverdueCount: number;
+  initialManualActions: ManualAgendaItem[];
+  initialManualTotal: number;
 }
 
 export function AgendaPageClient({ 
@@ -26,6 +30,8 @@ export function AgendaPageClient({
   initialTotalActive,
   initialTodayCount,
   initialOverdueCount,
+  initialManualActions,
+  initialManualTotal,
 }: AgendaPageClientProps) {
   const [selectedStage, setSelectedStage] = useState<number | null>(null);
   const [leads, setLeads] = useState(initialLeads);
@@ -35,28 +41,43 @@ export function AgendaPageClient({
   const [todayCount, setTodayCount] = useState(initialTodayCount);
   const [overdueCount, setOverdueCount] = useState(initialOverdueCount);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Ações manuais
+  const [manualActions, setManualActions] = useState<ManualAgendaItem[]>(initialManualActions);
+  const [manualTotal, setManualTotal] = useState(initialManualTotal);
+
+  // Modal de agendamento manual
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
   const { activeOperator } = useOperator();
 
-  // Função para recarregar todos os dados da agenda
+  // Total combinado para exibição na lista
+  const combinedTotal = totalPending; // getAgendaCounts já soma cadência + manual
+
+  // Função de refresh completo da agenda (cadência + ações manuais + contadores)
   const refreshAgenda = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Busca dados atualizados em paralelo
-      const [leadsResult, stagesResult, countsResult] = await Promise.all([
+      const [leadsResult, stagesResult, countsResult, manualResult] = await Promise.all([
         getAgendaLeads({ stageFilter: selectedStage || undefined }),
         getStageCounts(),
-        getAgendaCounts({ 
+        getAgendaCounts({
           stageFilter: selectedStage || undefined,
-          operatorId: activeOperator?.id 
+          operatorId: activeOperator?.id,
+        }),
+        getManualActions({
+          operatorId: activeOperator?.id,
         }),
       ]);
-      
+
       setLeads(leadsResult.leads);
-      setTotalPending(leadsResult.totalPending);
+      setTotalPending(leadsResult.totalPending + manualResult.totalPending);
       setStages(stagesResult.stages);
       setTotalActive(stagesResult.totalActive);
       setTodayCount(countsResult.todayCount);
       setOverdueCount(countsResult.overdueCount);
+      setManualActions(manualResult.actions);
+      setManualTotal(manualResult.totalPending);
     } catch (error) {
       console.error('Erro ao atualizar agenda:', error);
     } finally {
@@ -64,7 +85,7 @@ export function AgendaPageClient({
     }
   }, [selectedStage, activeOperator?.id]);
 
-  // Recalcula contagens ao trocar de operador
+  // Recalcula ao trocar de operador
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -78,17 +99,17 @@ export function AgendaPageClient({
     const newStage = selectedStage === stageOrder ? null : stageOrder;
     setSelectedStage(newStage);
     setIsLoading(true);
-    
+
     try {
       const [leadsResult, countsResult] = await Promise.all([
         getAgendaLeads({ stageFilter: newStage || undefined }),
-        getAgendaCounts({ 
+        getAgendaCounts({
           stageFilter: newStage || undefined,
-          operatorId: activeOperator?.id 
+          operatorId: activeOperator?.id,
         }),
       ]);
       setLeads(leadsResult.leads);
-      setTotalPending(leadsResult.totalPending);
+      setTotalPending(leadsResult.totalPending + manualTotal);
       setTodayCount(countsResult.todayCount);
       setOverdueCount(countsResult.overdueCount);
     } catch (error) {
@@ -107,7 +128,7 @@ export function AgendaPageClient({
         getAgendaCounts({ operatorId: activeOperator?.id }),
       ]);
       setLeads(leadsResult.leads);
-      setTotalPending(leadsResult.totalPending);
+      setTotalPending(leadsResult.totalPending + manualTotal);
       setTodayCount(countsResult.todayCount);
       setOverdueCount(countsResult.overdueCount);
     } catch (error) {
@@ -117,19 +138,33 @@ export function AgendaPageClient({
     }
   };
 
-  // Estatísticas dos cards vêm do servidor (getAgendaCounts)
-  // todayCount = ações com nextScheduledAt <= fim do dia (inclui vencidas + hoje)
-  // overdueCount = ações com nextScheduledAt < início do dia (apenas vencidas)
-
   const stats = [
-    { label: 'Vencidos', value: overdueCount.toString().padStart(2, '0'), color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-950/20', borderColor: 'border-rose-100 dark:border-rose-900/30' },
-    { label: 'Para Hoje', value: todayCount.toString().padStart(2, '0'), color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/20', borderColor: 'border-amber-100 dark:border-amber-900/30' },
-    { label: 'Total Fila', value: totalPending.toString(), color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/20', borderColor: 'border-indigo-100 dark:border-indigo-900/30' },
+    {
+      label: 'Vencidos',
+      value: overdueCount.toString().padStart(2, '0'),
+      color: 'text-rose-500',
+      bg: 'bg-rose-50 dark:bg-rose-950/20',
+      borderColor: 'border-rose-100 dark:border-rose-900/30',
+    },
+    {
+      label: 'Para Hoje',
+      value: todayCount.toString().padStart(2, '0'),
+      color: 'text-amber-500',
+      bg: 'bg-amber-50 dark:bg-amber-950/20',
+      borderColor: 'border-amber-100 dark:border-amber-900/30',
+    },
+    {
+      label: 'Total Fila',
+      value: combinedTotal.toString(),
+      color: 'text-indigo-500',
+      bg: 'bg-indigo-50 dark:bg-indigo-950/20',
+      borderColor: 'border-indigo-100 dark:border-indigo-900/30',
+    },
   ];
 
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 space-y-6">
-      {/* Cabeçalho de Estatísticas */}
+      {/* Cards de Estatísticas */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat) => (
           <div
@@ -147,15 +182,15 @@ export function AgendaPageClient({
         ))}
       </section>
 
-      {/* Painel de Estágios com clique */}
-      <AgendaStagePanel 
-        stages={stages} 
+      {/* Painel de Estágios */}
+      <AgendaStagePanel
+        stages={stages}
         totalActive={totalActive}
         selectedStage={selectedStage}
         onStageClick={handleStageClick}
       />
 
-      {/* Indicador de filtro ativo */}
+      {/* Filtro de estágio ativo */}
       {selectedStage && (
         <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl">
           <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
@@ -170,19 +205,30 @@ export function AgendaPageClient({
         </div>
       )}
 
-      {/* Título e Filtros */}
+      {/* Cabeçalho + botão Agendar Ação */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Agenda Operacional</h1>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            Agenda Operacional
+          </h1>
           <p className="text-slate-500 font-medium tracking-tight">
-            {selectedStage 
-              ? `Exibindo leads do estágio ${selectedStage}` 
-              : 'Os 10 leads mais prioritários para seu follow-up hoje.'}
+            {selectedStage
+              ? `Exibindo leads do estágio ${selectedStage}`
+              : 'Os leads mais prioritários para seu follow-up hoje.'}
           </p>
         </div>
+
+        {/* Botão principal: Agendar Ação Manual */}
+        <button
+          onClick={() => setIsScheduleModalOpen(true)}
+          className="inline-flex items-center gap-2 px-5 py-3 bg-violet-600 text-white rounded-2xl font-black text-sm hover:bg-violet-700 transition-all shadow-lg shadow-violet-100 dark:shadow-none active:scale-95"
+        >
+          <CalendarPlus className="w-4 h-4" />
+          Agendar Ação
+        </button>
       </div>
 
-      {/* Lista de Prioridade */}
+      {/* Lista Unificada */}
       <Suspense fallback={
         <div className="space-y-4 animate-pulse">
           {[1, 2, 3].map(i => (
@@ -190,14 +236,22 @@ export function AgendaPageClient({
           ))}
         </div>
       }>
-        <AgendaList 
-          initialLeads={leads} 
-          totalPending={totalPending}
+        <AgendaList
+          initialLeads={leads}
+          manualActions={manualActions}
+          totalPending={combinedTotal}
           templates={initialTemplates}
           isLoading={isLoading}
           onActionComplete={refreshAgenda}
         />
       </Suspense>
+
+      {/* Modal de Agendamento Manual */}
+      <ScheduleActionModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSuccess={refreshAgenda}
+      />
     </div>
   );
 }

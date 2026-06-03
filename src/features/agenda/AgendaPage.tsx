@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { getAgendaLeads, getStageCounts, getAgendaCounts } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
+import { getManualActions } from '@/actions/manual-actions';
 import { AgendaPageClient } from './AgendaPageClient';
 
 export default async function AgendaPage() {
@@ -12,23 +13,27 @@ export default async function AgendaPage() {
     { leads, totalPending }, 
     templates,
     { stages, totalActive },
-    { todayCount: initialTodayCount, overdueCount: initialOverdueCount }
+    { todayCount: initialTodayCount, overdueCount: initialOverdueCount },
+    { actions: initialManualActions, totalPending: initialManualTotal },
   ] = await Promise.all([
     getAgendaLeads(),
     getTemplates(),
     getStageCounts(),
-    getAgendaCounts({ operatorId })
+    getAgendaCounts({ operatorId }),
+    getManualActions({ operatorId }),
   ]);
 
   return (
     <AgendaPageClient
       initialLeads={leads}
-      initialTotalPending={totalPending}
+      initialTotalPending={totalPending + initialManualTotal}
       initialTemplates={templates}
       initialStages={stages}
       initialTotalActive={totalActive}
       initialTodayCount={initialTodayCount}
       initialOverdueCount={initialOverdueCount}
+      initialManualActions={initialManualActions}
+      initialManualTotal={initialManualTotal}
     />
   );
 }

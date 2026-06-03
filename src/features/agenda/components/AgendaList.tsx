@@ -8,51 +8,143 @@ import {
   PauseCircle,
   ArrowRight,
   Loader2,
-  Pencil
+  Pencil,
+  CalendarPlus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { LeadActionDrawer } from './LeadActionDrawer';
+import { ManualActionDrawer } from './ManualActionDrawer';
 import { LeadEditModal } from '@/components/shared/LeadEditModal';
 import { useLeadStore } from '@/lib/stores/lead-store';
-import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import type { UnifiedAgendaItem, CadenceAgendaItem, ManualAgendaItem } from '@/types/agenda';
+import { MANUAL_ACTION_TYPE_ICONS, MANUAL_ACTION_TYPE_LABELS } from '@/types/agenda';
 
 interface AgendaListProps {
-  initialLeads: any[];
-  totalPending: number;
+  initialLeads: any[]; // Itens de cadência (formato atual)
+  manualActions?: ManualAgendaItem[]; // Ações manuais (novo)
+  totalPending: number; // Total combinado
   templates: any[];
   isLoading?: boolean;
   stageFilter?: number | null;
   onActionComplete?: () => void;
 }
 
-export function AgendaList({ initialLeads, totalPending, templates, isLoading, stageFilter, onActionComplete }: AgendaListProps) {
-  const router = useRouter();
-  const { openLeadEditor, setLeads } = useLeadStore();
-  const [selectedLead, setSelectedLead] = useState<any | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [displayedLeads, setDisplayedLeads] = useState(initialLeads);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(totalPending > initialLeads.length);
+/**
+ * Combina e ordena itens de cadência e ações manuais em uma lista unificada.
+ * Ordenação: vencidos primeiro (mais antigos primeiro), depois por scheduledAt asc.
+ */
+function buildUnifiedList(
+  cadenceLeads: any[],
+  manualActions: ManualAgendaItem[]
+): UnifiedAgendaItem[] {
+  const cadenceItems: CadenceAgendaItem[] = cadenceLeads.map((lead) => ({
+    type: 'CADENCE' as const,
+    ...lead,
+    sortDate: new Date(lead.nextScheduledAt),
+  }));
+
+  const manualItems: ManualAgendaItem[] = manualActions.map((a) => ({
+    ...a,
+    sortDate: new Date(a.scheduledAt),
+  }));
+
+  const all: UnifiedAgendaItem[] = [...cadenceItems, ...manualItems];
+
+  // Ordena: data ascendente (vencidos aparecem primeiro por serem datas no passado)
+  return all.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+}
+
+/** Badge de tipo de ação */
+function ActionTypeBadge({ item }: { item: UnifiedAgendaItem }) {
+  if (item.type === 'CADENCE') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[9px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 px-2 py-0.5 rounded-full uppercase tracking-widest">
+        ⚡ Cadência
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[9px] font-black text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/50 px-2 py-0.5 rounded-full uppercase tracking-widest">
+      {MANUAL_ACTION_TYPE_ICONS[item.actionType]} Manual
+    </span>
+  );
+}
+
+/** Ícone de canal para o card */
+function ChannelIcon({ item }: { item: UnifiedAgendaItem }) {
+  if (item.type === 'CADENCE') {
+    const ch = item.currentStage?.channel;
+    if (ch === 'LINKEDIN') return <LinkedinIcon className="w-6 h-6 text-blue-600" />;
+    if (ch === 'WHATSAPP') return <span className="text-xl">💬</span>;
+    return <Mail className="w-6 h-6 text-indigo-600" />;
+  }
+  return (
+    <span className="text-xl">
+      {MANUAL_ACTION_TYPE_ICONS[item.actionType]}
+    </span>
+  );
+}
+
+/** Subtítulo do canal/tipo */
+function ChannelLabel({ item }: { item: UnifiedAgendaItem }) {
+  if (item.type === 'CADENCE') {
+    return (
+      <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
+        Estágio {item.currentStageOrder} ({item.currentStage?.channel ?? '—'})
+      </span>
+    );
+  }
+  return (
+    <span className="text-sm font-bold text-violet-600 dark:text-violet-400">
+      {MANUAL_ACTION_TYPE_LABELS[item.actionType]}
+      {item.channel ? ` · ${item.channel}` : ''}
+    </span>
+  );
+}
+
+export function AgendaList({
+  initialLeads,
+  manualActions = [],
+  totalPending,
+  templates,
+  isLoading,
+  stageFilter,
+  onActionComplete,
+}: AgendaListProps) {
+  const { setLeads } = useLeadStore();
+
+  // Cadência drawer state
+  const [selectedCadenceLead, setSelectedCadenceLead] = useState<any | null>(null);
+  const [isCadenceDrawerOpen, setIsCadenceDrawerOpen] = useState(false);
+
+  // Manual drawer state
+  const [selectedManualAction, setSelectedManualAction] = useState<ManualAgendaItem | null>(null);
+  const [isManualDrawerOpen, setIsManualDrawerOpen] = useState(false);
+
+  // Edit modal state
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingLeadData, setEditingLeadData] = useState<any | null>(null);
 
-  // Callback para quando uma ação for concluída
+  // Paginação
+  const [displayedCadenceLeads, setDisplayedCadenceLeads] = useState(initialLeads);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(totalPending > (initialLeads.length + manualActions.length));
+
+  // Callback para ação concluída
   const handleActionComplete = useCallback(() => {
-    if (onActionComplete) {
-      onActionComplete();
-    }
+    onActionComplete?.();
   }, [onActionComplete]);
 
-  // Popula o store com leads da agenda para edição compartilhada
+  // Sync quando initialLeads muda (refresh da agenda)
   const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
   if (initialLeads !== prevInitialLeads) {
-    setDisplayedLeads(initialLeads);
+    setDisplayedCadenceLeads(initialLeads);
     setPrevInitialLeads(initialLeads);
-    setHasMore(totalPending > initialLeads.length);
-    // Converte lead da agenda para formato LeadWithHistory
+    setHasMore(totalPending > (initialLeads.length + manualActions.length));
+
+    // Atualiza store para edição compartilhada
     const storeLeads = initialLeads.map((l: any) => ({
       ...l.lead,
       histories: [],
@@ -67,13 +159,29 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
     setLeads(storeLeads);
   }
 
-  const handleOpenAction = (lead: any) => {
-    setSelectedLead(lead);
-    setIsDrawerOpen(true);
+  // Lista unificada e ordenada
+  const unifiedList = buildUnifiedList(displayedCadenceLeads, manualActions);
+
+  const handleOpenCadenceAction = (lead: any) => {
+    setSelectedCadenceLead(lead);
+    setIsCadenceDrawerOpen(true);
   };
 
-  const handleEditLead = (lead: any) => {
-    // Abre modal de edição inline na agenda
+  const handleOpenManualAction = (action: ManualAgendaItem) => {
+    setSelectedManualAction(action);
+    setIsManualDrawerOpen(true);
+  };
+
+  const handleItemClick = (item: UnifiedAgendaItem) => {
+    if (item.type === 'CADENCE') {
+      handleOpenCadenceAction(item);
+    } else {
+      handleOpenManualAction(item);
+    }
+  };
+
+  const handleEditLead = (e: React.MouseEvent, lead: any) => {
+    e.stopPropagation();
     setEditingLeadData({
       ...lead.lead,
       histories: [],
@@ -90,16 +198,15 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
 
   async function loadMoreLeads() {
     if (isLoadingMore || !hasMore) return;
-    
     setIsLoadingMore(true);
     try {
       const { getAgendaLeadsMore } = await import('@/actions/cadence');
-      // Pegar o stageFilter do componente pai via prop ou contexto
-      const result = await getAgendaLeadsMore(displayedLeads.length);
-      
+      const result = await getAgendaLeadsMore(displayedCadenceLeads.length);
       if (result.leads && result.leads.length > 0) {
-        setDisplayedLeads(prev => [...prev, ...result.leads]);
-        setHasMore(displayedLeads.length + result.leads.length < totalPending);
+        setDisplayedCadenceLeads(prev => [...prev, ...result.leads]);
+        setHasMore(
+          displayedCadenceLeads.length + result.leads.length + manualActions.length < totalPending
+        );
       } else {
         setHasMore(false);
       }
@@ -110,7 +217,6 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
     }
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="space-y-4 animate-pulse">
@@ -121,7 +227,7 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
     );
   }
 
-  if (displayedLeads.length === 0) {
+  if (unifiedList.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl p-12 text-center space-y-4">
         <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center mx-auto">
@@ -137,107 +243,139 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
 
   return (
     <div className="space-y-4">
-      {displayedLeads.map((lead, idx) => (
-        <motion.div
-          key={lead.id}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: idx * 0.05 }}
-          onClick={() => handleOpenAction(lead)}
-          className={cn(
-            "group relative bg-white dark:bg-slate-900 border p-6 rounded-2xl transition-all hover:shadow-xl hover:-translate-y-0.5 cursor-pointer overflow-hidden",
-            lead.isExtremeUrgent 
-              ? "border-rose-100 dark:border-rose-900/30" 
-              : "border-slate-100 dark:border-slate-800"
-          )}
-        >
-          {lead.isExtremeUrgent && (
-            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]" />
-          )}
+      {unifiedList.map((item, idx) => {
+        const isManual = item.type === 'MANUAL';
+        const isOverdue = item.isOverdue;
+        const isExtremeUrgent = item.isExtremeUrgent;
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-slate-950 flex items-center justify-center border border-slate-100 dark:border-slate-800 transition-colors group-hover:border-indigo-200 dark:group-hover:border-indigo-800">
-                {lead.currentStage?.channel === 'LINKEDIN' ? <LinkedinIcon className="w-6 h-6 text-blue-600" /> : <Mail className="w-6 h-6 text-indigo-600" />}
+        return (
+          <motion.div
+            key={`${item.type}-${item.id}`}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.04 }}
+            onClick={() => handleItemClick(item)}
+            className={cn(
+              "group relative bg-white dark:bg-slate-900 border p-6 rounded-2xl transition-all hover:shadow-xl hover:-translate-y-0.5 cursor-pointer overflow-hidden",
+              isExtremeUrgent
+                ? "border-rose-100 dark:border-rose-900/30"
+                : isManual
+                ? "border-violet-100 dark:border-violet-900/30"
+                : "border-slate-100 dark:border-slate-800"
+            )}
+          >
+            {/* Barra lateral colorida */}
+            {isExtremeUrgent && (
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]" />
+            )}
+            {isManual && !isExtremeUrgent && (
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-violet-400 dark:bg-violet-600" />
+            )}
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              {/* Lado esquerdo: ícone + nome */}
+              <div className="flex items-center gap-6">
+                <div className={cn(
+                  "w-14 h-14 rounded-2xl flex items-center justify-center border transition-colors",
+                  isManual
+                    ? "bg-violet-50 dark:bg-violet-950/40 border-violet-100 dark:border-violet-800 group-hover:border-violet-300 dark:group-hover:border-violet-600"
+                    : "bg-slate-50 dark:bg-slate-950 border-slate-100 dark:border-slate-800 group-hover:border-indigo-200 dark:group-hover:border-indigo-800"
+                )}>
+                  <ChannelIcon item={item} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 tracking-tight flex-wrap">
+                    {item.lead.fullName}
+                    {isExtremeUrgent && (
+                      <span className="flex items-center gap-1 text-[10px] bg-rose-50 dark:bg-rose-950/30 text-rose-600 px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-rose-100 dark:border-rose-800/50">
+                        <AlertCircle className="w-3 h-3" /> Urgente
+                      </span>
+                    )}
+                    <ActionTypeBadge item={item} />
+                  </h3>
+                  <p className="text-slate-400 font-medium text-sm">
+                    {item.lead.company || 'Empresa não informada'}
+                    {isManual && (item as ManualAgendaItem).title !== `${MANUAL_ACTION_TYPE_ICONS[(item as ManualAgendaItem).actionType]} ${MANUAL_ACTION_TYPE_LABELS[(item as ManualAgendaItem).actionType]}`
+                      ? ` · ${(item as ManualAgendaItem).title}`
+                      : ''
+                    }
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-                  {lead.lead.fullName}
-                  {lead.isExtremeUrgent && (
-                    <span className="flex items-center gap-1 text-[10px] bg-rose-50 dark:bg-rose-950/30 text-rose-600 px-2 py-0.5 rounded-full font-black uppercase tracking-widest border border-rose-100 dark:border-rose-800/50">
-                      <AlertCircle className="w-3 h-3" /> Urgente
+
+              {/* Lado direito: canal + próxima ação + botões */}
+              <div className="flex flex-wrap items-center gap-8">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Canal</p>
+                  <div className="flex items-center gap-2">
+                    <ChannelLabel item={item} />
+                  </div>
+                </div>
+
+                <div className="space-y-1 min-w-0">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                    {isManual ? 'Agendado para' : 'Próxima Ação'}
+                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 text-sm">
+                    <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                      {item.nextActionPrimary || 'Pronto'}
                     </span>
+                    <span className="text-slate-300">•</span>
+                    {item.nextActionIsToday && (
+                      <span className="text-sm font-bold text-blue-600 whitespace-nowrap">Hoje</span>
+                    )}
+                    {item.nextActionIsTomorrow && (
+                      <span className="text-sm font-bold text-blue-600 whitespace-nowrap">Amanhã</span>
+                    )}
+                    {item.nextActionSecondary && !item.nextActionIsToday && !item.nextActionIsTomorrow && (
+                      <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
+                        {item.nextActionSecondary}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Botões de ação */}
+                <div className="flex items-center gap-3">
+                  {/* Editar lead — apenas para cadência */}
+                  {item.type === 'CADENCE' && (
+                    <>
+                      <button
+                        onClick={(e) => handleEditLead(e, item)}
+                        className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                        title="Editar lead"
+                      >
+                        <Pencil className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      >
+                        <PauseCircle className="w-5 h-5" />
+                      </button>
+                    </>
                   )}
-                </h3>
-                <p className="text-slate-400 font-medium text-sm">{lead.lead.company || 'Empresa não informada'}</p>
+
+                  {/* Botão principal */}
+                  <div className={cn(
+                    "flex items-center gap-2 pl-6 pr-4 py-3 rounded-2xl font-bold text-sm transition-all shadow-lg active:scale-95 group/btn",
+                    isManual
+                      ? "bg-violet-600 text-white hover:bg-violet-700 shadow-violet-100 dark:shadow-none"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none"
+                  )}>
+                    {isManual ? 'Executar' : 'Executar'}
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                  </div>
+                </div>
               </div>
             </div>
+          </motion.div>
+        );
+      })}
 
-            <div className="flex flex-wrap items-center gap-8">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Canal</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                    Estágio {lead.currentStageOrder} ({lead.currentStage?.channel})
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1 min-w-0">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Próxima Ação</p>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 text-sm">
-                  {/* Tempo restante - menor, sem destaque */}
-                  <span className="text-xs font-medium text-slate-400 whitespace-nowrap">
-                    {lead.nextActionPrimary || lead.timeDisplay || 'Pronto'}
-                  </span>
-                  {/* Separador */}
-                  <span className="text-slate-300">•</span>
-                  {/* Data em destaque azul */}
-                  {lead.nextActionIsToday && (
-                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      Hoje
-                    </span>
-                  )}
-                  {lead.nextActionIsTomorrow && (
-                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      Amanhã
-                    </span>
-                  )}
-                  {lead.nextActionSecondary && !lead.nextActionIsToday && !lead.nextActionIsTomorrow && (
-                    <span className="text-sm font-bold text-blue-600 whitespace-nowrap">
-                      {lead.nextActionSecondary}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleEditLead(lead); }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
-                  title="Editar lead"
-                >
-                  <Pencil className="w-5 h-5" />
-                </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); }}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
-                >
-                  <PauseCircle className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-2 bg-indigo-600 text-white pl-6 pr-4 py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 dark:shadow-none active:scale-95 group/btn">
-                  Executar
-                  <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      ))}
-      
       {/* Botão Mostrar Mais */}
       {hasMore && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="flex justify-center py-4"
@@ -248,43 +386,31 @@ export function AgendaList({ initialLeads, totalPending, templates, isLoading, s
             className="flex items-center gap-2 px-8 py-3 bg-white dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-bold rounded-2xl hover:border-indigo-500 hover:text-indigo-600 dark:hover:border-indigo-500 dark:hover:text-indigo-400 transition-all disabled:opacity-50"
           >
             {isLoadingMore ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Carregando...
-              </>
+              <><Loader2 className="w-5 h-5 animate-spin" /> Carregando...</>
             ) : (
-              <>
-                <Clock className="w-5 h-5" />
-                Mostrar mais ({totalPending - displayedLeads.length} restantes)
-              </>
+              <><Clock className="w-5 h-5" /> Mostrar mais</>
             )}
           </button>
         </motion.div>
       )}
 
-      {/* Mensagem quando não há mais */}
-      {!hasMore && totalPending > displayedLeads.length && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-6 text-center"
-        >
-          <p className="text-indigo-600 dark:text-indigo-400 font-medium">
-            Todos os {totalPending} leads da agenda foram exibidos.
-          </p>
-        </motion.div>
-      )}
-
-      {/* Modal Lateral */}
-      <LeadActionDrawer 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-        leadProgress={selectedLead}
+      {/* Drawers */}
+      <LeadActionDrawer
+        isOpen={isCadenceDrawerOpen}
+        onClose={() => setIsCadenceDrawerOpen(false)}
+        leadProgress={selectedCadenceLead}
         templates={templates}
         onActionComplete={handleActionComplete}
       />
 
-      {/* Modal de Edição Inline */}
+      <ManualActionDrawer
+        isOpen={isManualDrawerOpen}
+        onClose={() => setIsManualDrawerOpen(false)}
+        action={selectedManualAction}
+        onActionComplete={handleActionComplete}
+      />
+
+      {/* Modal de Edição de Lead */}
       {editingLeadData && (
         <LeadEditModal
           lead={editingLeadData}
