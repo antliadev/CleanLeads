@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
-import { CadenceProvider } from '@/components/providers/CadenceProvider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -29,10 +28,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <CadenceProvider>
-            {children}
-            <Toaster position="top-right" richColors closeButton />
-          </CadenceProvider>
+          {children}
+          <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

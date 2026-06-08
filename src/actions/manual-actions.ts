@@ -484,18 +484,19 @@ export async function getLeadsForActionSelect(search?: string): Promise<
   const profile = await getAuthProfile();
   if (!profile) throw new Error('Não autorizado');
 
+  const term = search?.trim();
+  if (!term) return [];
+
   return prisma.lead.findMany({
     where: {
       profileId: profile.id,
-      ...(search?.trim() && {
-        OR: [
-          { fullName: { contains: search.trim(), mode: 'insensitive' } },
-          { company: { contains: search.trim(), mode: 'insensitive' } },
-        ],
-      }),
+      OR: [
+        { fullName: { contains: term, mode: 'insensitive' } },
+        { company: { contains: term, mode: 'insensitive' } },
+      ],
     },
     select: { id: true, fullName: true, company: true },
     orderBy: { fullName: 'asc' },
-    take: 100,
+    take: 25,
   });
 }

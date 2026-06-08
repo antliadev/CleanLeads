@@ -2,17 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { Search, X, Loader2 } from 'lucide-react';
-import { useTransition, useState, useEffect, useRef, useCallback } from 'react';
+import { useTransition, useState, useEffect, useCallback } from 'react';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 
 /**
  * Filtros da página de Leads.
  *
- * Comportamento de busca (texto):
- *  - Auto-search: debounce 300ms ao digitar (mín. 2 chars) — dispara server search
- *  - Manual: clicar na lupa ou pressionar Enter dispara imediatamente
- *  - Limpar (X no campo): reseta busca de texto e recarrega todos os leads
+ * Comportamento de busca (texto): execucao somente por Enter ou lupa.
  *
  * Filtros de Status e Estágio disparam imediatamente ao mudar o select.
  *
@@ -21,7 +18,6 @@ import { cn } from '@/lib/utils';
 export function LeadFilters() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Lê URL atual (SSR-safe) ────────────────────────────────────────────────
   const getUrlParams = () => {
@@ -49,48 +45,39 @@ export function LeadFilters() {
     (newParams: Record<string, string>) => {
       const params = new URLSearchParams(window.location.search);
       Object.entries(newParams).forEach(([k, v]) => {
-        v ? params.set(k, v) : params.delete(k);
+        if (v) {
+          params.set(k, v);
+        } else {
+          params.delete(k);
+        }
       });
       params.delete('page'); // reseta paginação ao filtrar
-      startTransition(() => router.push(`/leads?${params.toString()}`));
+      const qs = params.toString();
+      const href = qs ? `/leads?${qs}` : '/leads';
+      startTransition(() => router.push(href));
     },
     [router]
   );
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
 
-  // onChange: atualiza campo local + dispara busca automática (debounce 300ms)
   const handleInputChange = (value: string) => {
     setLocalSearch(value);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(() => {
-      if (value.trim().length >= 2) {
-        updateUrl({ search: value.trim() });
-      } else if (value.trim() === '') {
-        updateUrl({ search: '' }); // campo vazio → remove filtro
-      }
-    }, 300);
   };
 
   // Limpa o campo de texto e remove filtro de busca da URL
   const handleClearSearch = () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     setLocalSearch('');
     updateUrl({ search: '' });
   };
 
-  // Enter ou click na lupa → busca imediata (cancela debounce pendente)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     updateUrl({ search: localSearch.trim() });
   };
 
   // Limpa TODOS os filtros e volta à lista completa
   const clearAll = () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     setLocalSearch('');
     startTransition(() => router.push('/leads'));
   };

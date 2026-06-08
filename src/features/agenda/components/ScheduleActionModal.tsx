@@ -87,6 +87,7 @@ export function ScheduleActionModal({
   const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
   const [isLoadingLeads, setIsLoadingLeads] = useState(false);
   const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+  const [leadSearchError, setLeadSearchError] = useState<string | null>(null);
 
   // Reset ao abrir
   useEffect(() => {
@@ -99,6 +100,9 @@ export function ScheduleActionModal({
       setTitle('');
       setNotes('');
       setDateTimeLocal(defaultDateTimeLocal());
+      setLeadOptions([]);
+      setShowLeadDropdown(false);
+      setLeadSearchError(null);
     }
   }, [isOpen, preselectedLeadId, preselectedLeadName]);
 
@@ -107,32 +111,44 @@ export function ScheduleActionModal({
     if (!title || ACTION_TYPES.some(t => t.label === title || `${t.emoji} ${t.label}` === title)) {
       setTitle(`${MANUAL_ACTION_TYPE_ICONS[actionType]} ${MANUAL_ACTION_TYPE_LABELS[actionType]}`);
     }
-  }, [actionType]);
+  }, [actionType, title]);
 
-  // Busca leads
   const searchLeads = useCallback(async (query: string) => {
+    const normalizedQuery = query.trim();
+
+    if (!normalizedQuery) {
+      setLeadOptions([]);
+      setShowLeadDropdown(true);
+      setLeadSearchError('Digite um nome ou empresa para pesquisar.');
+      return;
+    }
+
+    setLeadSearchError(null);
     setIsLoadingLeads(true);
+    setShowLeadDropdown(true);
     try {
-      const results = await getLeadsForActionSelect(query || undefined);
+      const results = await getLeadsForActionSelect(normalizedQuery);
       setLeadOptions(results);
     } catch {
-      // silently fail
+      setLeadOptions([]);
+      setLeadSearchError('Erro ao buscar leads.');
     } finally {
       setIsLoadingLeads(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (!showLeadDropdown) return;
-    const timer = setTimeout(() => searchLeads(leadSearch), 300);
-    return () => clearTimeout(timer);
-  }, [leadSearch, showLeadDropdown, searchLeads]);
 
   const handleSelectLead = (lead: LeadOption) => {
     setSelectedLeadId(lead.id);
     setSelectedLeadName(lead.fullName);
     setLeadSearch(lead.fullName);
     setShowLeadDropdown(false);
+    setLeadSearchError(null);
+  };
+
+  const handleLeadSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    searchLeads(leadSearch);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -244,37 +260,57 @@ export function ScheduleActionModal({
                           setLeadSearch(e.target.value);
                           setSelectedLeadId('');
                           setSelectedLeadName('');
-                          setShowLeadDropdown(true);
+                          setLeadOptions([]);
+                          setShowLeadDropdown(false);
+                          setLeadSearchError(null);
                         }}
-                        onFocus={() => setShowLeadDropdown(true)}
+                        onFocus={() => setShowLeadDropdown(leadOptions.length > 0 || !!leadSearchError)}
+                        onKeyDown={handleLeadSearchKeyDown}
                         placeholder="Buscar lead pelo nome ou empresa..."
-                        className="w-full pl-10 pr-4 py-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium outline-none focus:border-violet-500 transition-all"
+                        className="w-full pl-10 pr-12 py-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium outline-none focus:border-violet-500 transition-all"
                       />
-                      {isLoadingLeads && (
-                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => searchLeads(leadSearch)}
+                        disabled={isLoadingLeads}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors disabled:opacity-50"
+                        title="Pesquisar lead"
+                        aria-label="Pesquisar lead"
+                      >
+                        {isLoadingLeads ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </button>
                     </div>
 
                     {/* Dropdown de resultados */}
-                    {showLeadDropdown && leadOptions.length > 0 && (
+                    {showLeadDropdown && (leadOptions.length > 0 || leadSearchError || (!isLoadingLeads && leadSearch.trim() && leadOptions.length === 0)) && (
                       <motion.div
                         initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-10 overflow-hidden max-h-48 overflow-y-auto"
                       >
-                        {leadOptions.map((lead) => (
-                          <button
-                            key={lead.id}
-                            type="button"
-                            onClick={() => handleSelectLead(lead)}
-                            className="w-full text-left px-4 py-3 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
-                          >
-                            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{lead.fullName}</p>
-                            {lead.company && (
-                              <p className="text-xs text-slate-400 font-medium">{lead.company}</p>
-                            )}
-                          </button>
-                        ))}
+                        {leadSearchError ? (
+                          <div className="px-4 py-3 text-sm font-medium text-rose-500">
+                            {leadSearchError}
+                          </div>
+                        ) : leadOptions.length > 0 ? (
+                          leadOptions.map((lead) => (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              onClick={() => handleSelectLead(lead)}
+                              className="w-full text-left px-4 py-3 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors border-b border-slate-50 dark:border-slate-800 last:border-0"
+                            >
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{lead.fullName}</p>
+                              {lead.company && (
+                                <p className="text-xs text-slate-400 font-medium">{lead.company}</p>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-sm font-medium text-slate-400">
+                            Nenhum lead encontrado
+                          </div>
+                        )}
                       </motion.div>
                     )}
 
@@ -291,6 +327,9 @@ export function ScheduleActionModal({
                             setSelectedLeadId('');
                             setSelectedLeadName('');
                             setLeadSearch('');
+                            setLeadOptions([]);
+                            setShowLeadDropdown(false);
+                            setLeadSearchError(null);
                           }}
                           className="ml-auto text-violet-400 hover:text-violet-600"
                         >

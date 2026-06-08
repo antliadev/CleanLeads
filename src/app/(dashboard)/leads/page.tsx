@@ -72,7 +72,6 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
             </div>
           }>
             <LeadsTableWrapper
-              key={`${search}|${status}|${stage}|${page}`}
               initialLeads={safeLeads}
               initialTotal={safeTotal}
               initialPage={page}

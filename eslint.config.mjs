@@ -9,8 +9,12 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    "**/.next/**",
+    "CleanLeads/**",
     "out/**",
     "build/**",
+    "node_modules/**",
+    "prisma/generated/**",
     "next-env.d.ts",
   ]),
 ]);

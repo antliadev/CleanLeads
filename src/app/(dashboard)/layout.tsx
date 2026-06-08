@@ -30,7 +30,8 @@ export default async function DashboardLayout({
   }) : [];
 
   return (
-    <OperatorProvider operators={operators}>
+    <CadenceProvider>
+      <OperatorProvider operators={operators}>
       <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
         <Sidebar />
         <div className="flex-1 ml-64">
@@ -40,6 +41,7 @@ export default async function DashboardLayout({
           </main>
         </div>
       </div>
-    </OperatorProvider>
+      </OperatorProvider>
+    </CadenceProvider>
   );
 }

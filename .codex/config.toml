@@ -1,0 +1,5 @@
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp"
+
+[mcp_servers.supabase.http_headers]
+Authorization = "Bearer sb_secret_q6ZfKQZZXkkdwlfd6yYKKQ_PMwKe5df"

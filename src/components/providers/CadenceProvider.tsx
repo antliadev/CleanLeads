@@ -1,9 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { checkUrgencyState } from '@/actions/notifications';
 import { toast } from 'sonner';
+
+type AudioContextWindow = Window & typeof globalThis & {
+  webkitAudioContext?: typeof AudioContext;
+};
 
 interface CadenceContextType {
   unreadCount: number;
@@ -22,19 +26,14 @@ export function CadenceProvider({ children }: { children: React.ReactNode }) {
   });
 
   const lastHashRef = useRef('');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const unreadCountRef = useRef(0);
 
-  // Inicializa áudio com um 'Chime' sintético em Base64 para garantir disponibilidade
-  useEffect(() => {
-    // Som curto e limpo de notificação (Chime)
-    const chimeBase64 = "data:audio/mp3;base64,SUQzBAAAAAABEVRYWFhYAAAAHAAAAGNoaW1lX2F1ZGlvX2Jhc2U2NF9zb3VuZAAA//uQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABY29tYm8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7kmRAAAAHAAAABQAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZEAAAAcAAAAFAAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZEAAAAcAAAAFAAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    // Nota: Como não posso gerar um binário MP3 real complexo aqui, vou usar um som de sistema padrão ou garantir que o erro não trave a app.
-    // Na verdade, vou usar um som de oscilador via Web Audio API para ser 100% sênior e independente de assets.
-  }, []);
-
-  const playNotificationSound = () => {
+  const playNotificationSound = useCallback(() => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextCtor = window.AudioContext || (window as AudioContextWindow).webkitAudioContext;
+      if (!AudioContextCtor) return;
+
+      const audioContext = new AudioContextCtor();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -42,52 +41,58 @@ export function CadenceProvider({ children }: { children: React.ReactNode }) {
       gainNode.connect(audioContext.destination);
 
       oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
-      oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.5); // A4
+      oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(440, audioContext.currentTime + 0.5);
 
       gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
 
       oscillator.start();
       oscillator.stop(audioContext.currentTime + 0.5);
-    } catch (e) {
-      console.warn("Web Audio omitido - interação do usuário necessária.");
+    } catch {
+      console.warn('Web Audio omitido - interacao do usuario necessaria.');
     }
-  };
+  }, []);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const result = await checkUrgencyState();
       if (!result) return;
 
-      // Se o hash mudou e temos novas notificações não lidas, toca som
-      if (result.stateHash !== lastHashRef.current && result.unreadCount > state.unreadCount) {
+      if (result.stateHash !== lastHashRef.current && result.unreadCount > unreadCountRef.current) {
         playNotificationSound();
-        toast.info(`Você tem novas notificações de cadência pendentes.`, {
-          icon: <AlertCircle className="w-4 h-4 text-rose-500" />
+        toast.info('Voce tem novas notificacoes de cadencia pendentes.', {
+          icon: <AlertCircle className="w-4 h-4 text-rose-500" />,
         });
       }
 
       lastHashRef.current = result.stateHash;
+      unreadCountRef.current = result.unreadCount;
       setState({
         unreadCount: result.unreadCount,
         hasNewUrgency: result.hasNewUrgency,
         stateHash: result.stateHash,
       });
     } catch (error) {
-      console.error('Erro no polling da cadência:', error);
+      console.error('Erro no polling da cadencia:', error);
     }
-  };
+  }, [playNotificationSound]);
 
-  // Polling a cada 60 segundos
   useEffect(() => {
-    refresh();
+    const initialRefresh = window.setTimeout(() => {
+      refresh();
+    }, 0);
     const interval = setInterval(refresh, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      clearInterval(interval);
+    };
+  }, [refresh]);
+
+  const value = useMemo(() => ({ ...state, refresh }), [state, refresh]);
 
   return (
-    <CadenceContext.Provider value={{ ...state, refresh }}>
+    <CadenceContext.Provider value={value}>
       {children}
     </CadenceContext.Provider>
   );

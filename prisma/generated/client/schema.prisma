@@ -59,6 +59,12 @@ model Lead {
   @@index([status])
   @@index([source])
   @@index([createdAt])
+  @@index([profileId, updatedAt(sort: Desc)], map: "idx_leads_profile_updated_at")
+  @@index([profileId, status, updatedAt(sort: Desc)], map: "idx_leads_profile_status_updated_at")
+  @@index([profileId, source], map: "idx_leads_profile_source")
+  @@index([profileId, fullName], map: "idx_leads_profile_full_name")
+  @@index([profileId, email], map: "idx_leads_profile_email")
+  @@index([profileId, linkedinUrl], map: "idx_leads_profile_linkedin")
   @@map("leads")
 }
 
@@ -122,6 +128,8 @@ model LeadCadenceProgress {
 
   @@index([profileId, status, nextScheduledAt])
   @@index([leadId])
+  @@index([profileId, status, currentStageOrder, nextScheduledAt, version], map: "idx_lead_cadence_stage_queue")
+  @@index([cadenceId, status], map: "idx_lead_cadence_cadence_status")
   @@map("lead_cadence_progress")
 }
 
@@ -159,6 +167,7 @@ model Template {
 
   @@index([profileId])
   @@index([channel])
+  @@index([profileId, channel], map: "idx_templates_profile_channel")
   @@map("templates")
 }
 
@@ -222,6 +231,7 @@ model Operator {
   completedManualActions LeadScheduledAction[] @relation("ManualActionCompletedBy")
 
   @@index([profileId])
+  @@index([profileId, isActive, createdAt(sort: Desc)], map: "idx_operators_profile_active_created")
   @@map("operators")
 }
 
@@ -257,6 +267,8 @@ model Notification {
 
   @@index([profileId])
   @@index([isRead])
+  @@index([profileId, isRead, createdAt(sort: Desc)], map: "idx_notifications_profile_read_created")
+  @@index([profileId, leadId, type, isRead], map: "idx_notifications_overdue_lookup")
   @@map("notifications")
 }
 
@@ -289,6 +301,7 @@ model LeadScheduledAction {
   @@index([profileId, status, scheduledAt])
   @@index([leadId])
   @@index([createdByOperatorId])
+  @@index([profileId, status, createdByOperatorId, scheduledAt], map: "idx_manual_actions_operator_queue")
   @@map("lead_scheduled_actions")
 }
 

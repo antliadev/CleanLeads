@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { 
   Clock, 
   AlertCircle, 
@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Loader2,
   Pencil,
-  CalendarPlus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -138,10 +137,8 @@ export function AgendaList({
   }, [onActionComplete]);
 
   // Sync quando initialLeads muda (refresh da agenda)
-  const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
-  if (initialLeads !== prevInitialLeads) {
+  useEffect(() => {
     setDisplayedCadenceLeads(initialLeads);
-    setPrevInitialLeads(initialLeads);
     setHasMore(totalPending > (initialLeads.length + manualActions.length));
 
     // Atualiza store para edição compartilhada
@@ -157,10 +154,13 @@ export function AgendaList({
       }
     }));
     setLeads(storeLeads);
-  }
+  }, [initialLeads, manualActions.length, setLeads, totalPending]);
 
   // Lista unificada e ordenada
-  const unifiedList = buildUnifiedList(displayedCadenceLeads, manualActions);
+  const unifiedList = useMemo(
+    () => buildUnifiedList(displayedCadenceLeads, manualActions),
+    [displayedCadenceLeads, manualActions]
+  );
 
   const handleOpenCadenceAction = (lead: any) => {
     setSelectedCadenceLead(lead);
@@ -201,7 +201,7 @@ export function AgendaList({
     setIsLoadingMore(true);
     try {
       const { getAgendaLeadsMore } = await import('@/actions/cadence');
-      const result = await getAgendaLeadsMore(displayedCadenceLeads.length);
+      const result = await getAgendaLeadsMore(displayedCadenceLeads.length, stageFilter || undefined);
       if (result.leads && result.leads.length > 0) {
         setDisplayedCadenceLeads(prev => [...prev, ...result.leads]);
         setHasMore(
@@ -245,7 +245,6 @@ export function AgendaList({
     <div className="space-y-4">
       {unifiedList.map((item, idx) => {
         const isManual = item.type === 'MANUAL';
-        const isOverdue = item.isOverdue;
         const isExtremeUrgent = item.isExtremeUrgent;
 
         return (

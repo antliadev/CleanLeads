@@ -242,6 +242,7 @@ export function AgendaPageClient({
           totalPending={combinedTotal}
           templates={initialTemplates}
           isLoading={isLoading}
+          stageFilter={selectedStage}
           onActionComplete={refreshAgenda}
         />
       </Suspense>
