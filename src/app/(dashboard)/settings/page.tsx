@@ -1,11 +1,23 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getOperators } from '@/actions/operators';
 import { getCadenceSettings } from '@/actions/cadence';
 import { getTemplates } from '@/actions/templates';
 import { OperatorsClient } from '@/features/operators/OperatorsClient';
-import { CadenceSettings } from '@/features/cadence/components/CadenceSettings';
+import dynamic from 'next/dynamic';
 
-export const dynamic = 'force-dynamic';
+const CadenceSettings = dynamic(
+  () => import('@/features/cadence/components/CadenceSettings').then((mod) => mod.CadenceSettings),
+  {
+    loading: () => (
+      <div className="animate-pulse space-y-4">
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+      </div>
+    ),
+    ssr: true,
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Configurações | LimpaLeads',
@@ -43,11 +55,13 @@ export default async function SettingsPage() {
           )}
 
           {cadence && (
-            <CadenceSettings 
-              cadenceId={cadence.id} 
-              initialStages={cadence.stages as any} 
-              templates={templates.map(t => ({ id: t.id, name: t.name, channel: t.channel }))}
-            />
+            <Suspense fallback={null}>
+              <CadenceSettings 
+                cadenceId={cadence.id} 
+                initialStages={cadence.stages as any} 
+                templates={templates.map(t => ({ id: t.id, name: t.name, channel: t.channel }))}
+              />
+            </Suspense>
           )}
         </div>
       </div>

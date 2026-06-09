@@ -5,9 +5,6 @@ import { getTemplates } from '@/actions/templates';
 import { LeadsTableWrapper } from '@/features/leads/LeadsTableWrapper';
 import { LeadFilters } from '@/features/leads/LeadFilters';
 
-// Desabilita cache para garantir que searchParams sempre chegam frescos ao servidor
-export const dynamic = 'force-dynamic';
-
 export const metadata = {
   title: 'Leads – LimpaLeads',
   description: 'Gerencie seus contatos comerciais',
@@ -18,14 +15,12 @@ interface LeadsPageProps {
 }
 
 export default async function LeadsPage({ searchParams }: LeadsPageProps) {
-  // Await searchParams as required by Next.js 15+ 
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const search = typeof params.search === 'string' ? params.search : '';
   const status = typeof params.status === 'string' ? params.status : '';
   const stage = typeof params.stage === 'string' ? params.stage : '';
 
-  // Carregar dados iniciais em paralelo (Server Side)
   const [result, templatesResult] = await Promise.all([
     getLeads({ page, search, status, stage }),
     getTemplates().catch(() => [])

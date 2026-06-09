@@ -32,3 +32,18 @@ export type LeadWithHistory = Prisma.LeadGetPayload<{
     };
   };
 }>;
+
+/** 
+ * Tipo completo com detalhes estendidos - carregado on-demand para o modal de edição
+ */
+export type LeadFullDetails = Prisma.LeadGetPayload<{
+  include: { 
+    histories: { orderBy: { createdAt: 'desc' }, take: 20 };
+    lastOperator: { select: { name: true } };
+    leadNotes: { 
+      include: { operator: { select: { name: true } } };
+      orderBy: { createdAt: 'desc' }; 
+      take: 20;
+    };
+  };
+}>;

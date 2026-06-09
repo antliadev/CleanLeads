@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LeadsTable } from './LeadsTable';
 import type { Template } from '@prisma/client';
 import type { LeadWithHistory } from './types';
-import { useLeadStore } from '@/lib/stores/lead-store';
+import { useLeadDataActions } from '@/lib/stores/lead-store';
 
 interface LeadsTableWrapperProps {
   initialLeads: LeadWithHistory[];
@@ -30,7 +30,7 @@ export function LeadsTableWrapper({ initialLeads, initialTotal, initialPage, ini
   const [totalPages, setTotalPages] = useState(initialTotalPages);
   const [error, setError] = useState<string | null>(null);
 
-  const { setLeads: syncLeadsToStore } = useLeadStore();
+  const { setLeads: syncLeadsToStore } = useLeadDataActions();
 
   useEffect(() => {
     const safeLeadsArray = Array.isArray(initialLeads) ? initialLeads : [];

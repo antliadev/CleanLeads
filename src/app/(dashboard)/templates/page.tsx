@@ -1,9 +1,20 @@
 import { Suspense } from 'react';
-import { FileText, Plus } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import { getTemplates } from '@/actions/templates';
-import { TemplatesClient } from '@/features/templates/TemplatesClient';
+import dynamic from 'next/dynamic';
 
-export const dynamic = 'force-dynamic';
+const TemplatesClient = dynamic(
+  () => import('@/features/templates/TemplatesClient').then((mod) => mod.TemplatesClient),
+  {
+    loading: () => (
+      <div className="animate-pulse space-y-4">
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+      </div>
+    ),
+    ssr: true,
+  }
+);
 
 export const metadata = {
   title: 'Templates – LimpaLeads',
@@ -28,7 +39,12 @@ export default async function TemplatesPage() {
         </p>
       </div>
 
-      <Suspense fallback={null}>
+      <Suspense fallback={
+        <div className="animate-pulse space-y-4">
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-40" />
+        </div>
+      }>
         <TemplatesClient templates={templates} />
       </Suspense>
     </div>

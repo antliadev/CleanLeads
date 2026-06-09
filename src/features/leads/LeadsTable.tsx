@@ -9,7 +9,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { LeadForm } from './LeadForm';
 import { LeadEditModal } from '@/components/shared/LeadEditModal';
-import { useLeadStore } from '@/lib/stores/lead-store';
+import { useLeadEditorState, useLeadEditorActions, useSelectedLead } from '@/lib/stores/lead-store';
 import { deleteLead, deleteAllLeads } from '@/actions/leads';
 import { formatDate, formatDateTime, getLinkedinProfileUrl, getGmailComposeUrl, cn } from '@/lib/utils';
 import { ContactActionModal } from './ContactActionModal';
@@ -52,11 +52,10 @@ export function LeadsTable({ leads, total, page, totalPages, templates, onPageCh
   const [isBulkUpdatingStage, setIsBulkUpdatingStage] = useState(false);
   const { activeOperator } = useOperator();
 
-  // Usa Zustand store para edição (sincronizado com Agenda)
-  const { selectedLeadId, isEditModalOpen, openLeadEditor, closeLeadEditor, leads: storeLeads } = useLeadStore();
-
-  // Encontra o lead selecionado nos leads locais
-  const editingLead = storeLeads.find(l => l.id === selectedLeadId) || null;
+  // Usa Zustand store com selectors granulares para evitar re-renders
+  const { isOpen: isEditModalOpen, isLoading: isLoadingEdit } = useLeadEditorState();
+  const { openLeadEditor, closeLeadEditor } = useLeadEditorActions();
+  const editingLead = useSelectedLead();
 
   // Combina estados de refreshing (interno + externo)
   const isRefreshing = isRefreshingInternal || externalRefreshing || false;

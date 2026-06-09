@@ -1,8 +1,36 @@
-import { LayoutDashboard } from 'lucide-react';
+import { Suspense } from 'react';
+import { LayoutDashboard, Loader2 } from 'lucide-react';
 import { getAnalytics } from '@/actions/analytics';
-import { AnalyticsDashboard } from '@/features/analytics/AnalyticsDashboard';
+import dynamic from 'next/dynamic';
 
-export const dynamic = 'force-dynamic';
+const AnalyticsDashboard = dynamic(
+  () => import('@/features/analytics/AnalyticsDashboard').then((mod) => mod.AnalyticsDashboard),
+  {
+    loading: () => (
+      <div className="space-y-6 animate-pulse">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-5 h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-64" />
+          <div className="lg:col-span-2 bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-64" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-48" />
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-6 h-48" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-slate-100 dark:bg:sLate-800 rounded-2xl p-5 h-24" />
+          <div className="bg-slate-100 dark:bg:sLate-800 rounded-2xl p-5 h-24" />
+          <div className="bg-slate-100 dark:bg:sLate-800 rounded-2xl p-5 h-24" />
+        </div>
+      </div>
+    ),
+    ssr: true,
+  }
+);
 
 export const metadata = {
   title: 'Dashboard – LimpaLeads',
@@ -25,7 +53,9 @@ export default async function AnalyticsPage() {
           Visão geral do desempenho dos seus leads
         </p>
       </div>
-      <AnalyticsDashboard data={data} />
+      <Suspense fallback={null}>
+        <AnalyticsDashboard data={data} />
+      </Suspense>
     </div>
   );
 }

@@ -1,6 +1,7 @@
-import { ImportWizard } from '@/features/imports/ImportWizard';
+import { Metadata } from 'next';
+import { ImportPageClient } from './ImportPageClient';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Importar Leads | LimpaLeads',
 };
 
@@ -12,7 +13,7 @@ export default function ImportPage() {
         <p className="text-slate-500 mt-1">Carregue dados de Excel ou CSV para sua base de contatos comerciais.</p>
       </header>
 
-      <ImportWizard />
+      <ImportPageClient />
     </div>
   );
 }

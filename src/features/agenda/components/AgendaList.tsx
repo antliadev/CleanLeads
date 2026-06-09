@@ -16,7 +16,7 @@ import { LinkedinIcon } from '@/components/icons/Linkedin';
 import { LeadActionDrawer } from './LeadActionDrawer';
 import { ManualActionDrawer } from './ManualActionDrawer';
 import { LeadEditModal } from '@/components/shared/LeadEditModal';
-import { useLeadStore } from '@/lib/stores/lead-store';
+import { useLeadDataActions } from '@/lib/stores/lead-store';
 import type { UnifiedAgendaItem, CadenceAgendaItem, ManualAgendaItem } from '@/types/agenda';
 import { MANUAL_ACTION_TYPE_ICONS, MANUAL_ACTION_TYPE_LABELS } from '@/types/agenda';
 
@@ -112,7 +112,7 @@ export function AgendaList({
   stageFilter,
   onActionComplete,
 }: AgendaListProps) {
-  const { setLeads } = useLeadStore();
+  const { setLeads } = useLeadDataActions();
 
   // Cadência drawer state
   const [selectedCadenceLead, setSelectedCadenceLead] = useState<any | null>(null);

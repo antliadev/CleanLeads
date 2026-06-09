@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_cache } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
@@ -175,12 +175,14 @@ export async function getLeads({
       prisma.lead.findMany({
         where,
         include: { 
-          histories: { orderBy: { createdAt: 'desc' }, take: 10 },
+          // Histórico limitado - apenas último para badge visual
+          histories: { orderBy: { createdAt: 'desc' }, take: 3 },
           lastOperator: { select: { name: true } },
+          // Notas limitadas - apenas últimas 3 para preview
           leadNotes: { 
             include: { operator: { select: { name: true } } },
             orderBy: { createdAt: 'desc' }, 
-            take: 10 
+            take: 3 
           },
           cadenceEngine: {
             select: {
@@ -193,9 +195,7 @@ export async function getLeads({
                       order: true,
                       channel: true,
                       template: {
-                        select: {
-                          name: true
-                        }
+                        select: { name: true }
                       }
                     }
                   }
@@ -251,13 +251,21 @@ export async function getLeadNotes(leadId: string) {
 }
 
 // ═══════════════════════
-// Buscar lead por ID
+// Buscar lead completo com detalhes (on-demand)
 // ═══════════════════════
 export async function getLeadById(id: string) {
   const profile = await getAuthProfile();
   const lead = await prisma.lead.findFirst({
     where: { id, profileId: profile.id },
-    include: { histories: { orderBy: { createdAt: 'desc' }, take: 20 } },
+    include: { 
+      histories: { orderBy: { createdAt: 'desc' }, take: 20 },
+      lastOperator: { select: { name: true } },
+      leadNotes: { 
+        include: { operator: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' }, 
+        take: 20 
+      },
+    },
   });
   if (!lead) throw new Error('Lead não encontrado');
   return lead;

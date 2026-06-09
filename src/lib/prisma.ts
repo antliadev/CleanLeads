@@ -6,7 +6,8 @@ const globalForPrisma = globalThis as unknown as {
   initialized: boolean;
 };
 
-// Initialize Prisma client with error handling
+// Initialize Prisma client with error handling and connection pooling
+// Pool config is handled at the Supabase project level via pgBouncer
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   
@@ -15,13 +16,23 @@ function createPrismaClient(): PrismaClient {
     throw new Error('DATABASE_URL não configurada. Configure a variável de ambiente DATABASE_URL.');
   }
 
+  // Supabase Pooler URL (use SUPABASE_POOL_URL if available, otherwise DATABASE_URL)
+  const poolUrl = process.env.SUPABASE_POOL_URL || connectionString;
+
   try {
-    const adapter = new PrismaPg({ connectionString });
+    const adapter = new PrismaPg({ 
+      connectionString: poolUrl,
+    });
+    
     const client = new PrismaClient({
       adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
+      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     });
-    console.log('[Prisma] Cliente criado com sucesso');
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Prisma] Cliente criado com sucesso');
+    }
+    
     return client;
   } catch (error) {
     console.error('[Prisma] Erro ao criar cliente:', error);
@@ -29,10 +40,12 @@ function createPrismaClient(): PrismaClient {
   }
 }
 
-// Get or create Prisma client
+// Get or create Prisma client (singleton for serverless)
 export function getPrisma(): PrismaClient {
   if (!globalForPrisma.prisma) {
-    console.log('[Prisma] Inicializando cliente...');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Prisma] Inicializando cliente...');
+    }
     globalForPrisma.prisma = createPrismaClient();
     globalForPrisma.initialized = true;
   }

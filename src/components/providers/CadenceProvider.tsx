@@ -79,13 +79,26 @@ export function CadenceProvider({ children }: { children: React.ReactNode }) {
   }, [playNotificationSound]);
 
   useEffect(() => {
+    // Initial refresh
     const initialRefresh = window.setTimeout(() => {
       refresh();
     }, 0);
-    const interval = setInterval(refresh, 60000);
+
+    // Polling a cada 2 minutos em vez de 1 minuto para reduzir carga
+    const interval = setInterval(refresh, 120_000);
+    
+    // Refresh também quando a janela receber foco (tab switch)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refresh();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.clearTimeout(initialRefresh);
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refresh]);
 

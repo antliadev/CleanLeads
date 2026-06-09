@@ -2,16 +2,16 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { Loader2, X, Pencil } from 'lucide-react';
-import { updateLead, type LeadFormResult } from '@/actions/leads';
+import { updateLead, getLeadById, type LeadFormResult } from '@/actions/leads';
 import { getCadenceSettings } from '@/actions/cadence';
 import { LEAD_STATUS_MAP } from '@/lib/constants';
 import { useOperator } from '@/components/providers/OperatorProvider';
-import type { LeadWithHistory } from '@/features/leads/types';
-import { useLeadStore } from '@/lib/stores/lead-store';
+import type { LeadFullDetails } from '@/features/leads/types';
+import { useLeadEditorActions } from '@/lib/stores/lead-store';
 import { toast } from 'sonner';
 
 interface LeadEditModalProps {
-  lead: LeadWithHistory | null;
+  lead: { id: string; fullName: string; email?: string | null; company?: string | null; jobTitle?: string | null; phone?: string | null; linkedinUrl?: string | null; customSource?: string | null; status?: string; notes?: string | null } | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -19,27 +19,48 @@ interface LeadEditModalProps {
 /**
  * Modal de edição de lead reutilizável.
  * Usado tanto na guia Leads quanto na Agenda.
+ * Carrega detalhes completos (históricos, notas) on-demand.
  */
 export function LeadEditModal({ lead, isOpen, onClose }: LeadEditModalProps) {
   const { activeOperator } = useOperator();
-  const { setSaving, closeLeadEditor } = useLeadStore();
+  const { setSaving, closeLeadEditor: closeEditorFromStore } = useLeadEditorActions();
+  const [fullLead, setFullLead] = useState<LeadFullDetails | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  
+  // Combina o onClose do props com o close do store
+  const handleClose = () => {
+    onClose();
+    closeEditorFromStore();
+    setFullLead(null);
+  };
+
   const [cadenceStages, setCadenceStages] = useState<{ order: number; channel: string; templateName?: string }[]>([]);
   const [selectedStageOrder, setSelectedStageOrder] = useState<string>('');
 
-  // Busca estágios da cadência quando modal abre
+  // Carrega detalhes completos do lead on-demand quando modal abre
   useEffect(() => {
-    if (isOpen && lead) {
-      getCadenceSettings().then((cadence) => {
+    if (isOpen && lead?.id) {
+      setIsLoadingDetails(true);
+      Promise.all([
+        getLeadById(lead.id),
+        getCadenceSettings()
+      ]).then(([fullDetails, cadence]) => {
+        setFullLead(fullDetails);
         if (cadence?.stages) {
           setCadenceStages(cadence.stages);
-          const currentStage = (lead as any)?.cadenceEngine?.currentStageOrder;
+          const currentStage = (fullDetails as any)?.cadenceEngine?.currentStageOrder;
           if (currentStage) {
             setSelectedStageOrder(String(currentStage));
           }
         }
+      }).catch((err) => {
+        console.error('Erro ao carregar detalhes do lead:', err);
+        toast.error('Erro ao carregar dados completos do lead');
+      }).finally(() => {
+        setIsLoadingDetails(false);
       });
     }
-  }, [isOpen, lead]);
+  }, [isOpen, lead?.id]);
 
   // Trava scroll quando modal abre
   useEffect(() => {
@@ -66,9 +87,9 @@ export function LeadEditModal({ lead, isOpen, onClose }: LeadEditModalProps) {
   useEffect(() => {
     if (state?.success) {
       toast.success('Lead atualizado com sucesso!');
-      closeLeadEditor();
+      handleClose();
     }
-  }, [state?.success]);
+  }, [state?.success, handleClose]);
 
   if (!isOpen || !lead) return null;
 
